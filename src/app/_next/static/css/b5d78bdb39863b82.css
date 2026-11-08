@@ -2848,6 +2848,36 @@
     overflow: hidden;
     width: 100%;
 }
+/* for PulseSync: BEGIN layer a blurred cover below the desktop player and lyrics */
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) {
+    isolation: isolate;
+    position: relative;
+}
+[data-overtone-fullscreen-cover-background] {
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    z-index: -1;
+}
+[data-overtone-fullscreen-cover-background] img {
+    filter: blur(3rem) saturate(0.85) brightness(0.28);
+    height: calc(100% + 12rem);
+    inset: -6rem;
+    object-fit: cover;
+    opacity: 0;
+    position: absolute;
+    width: calc(100% + 12rem);
+}
+[data-overtone-fullscreen-cover-background] img[data-loaded] {
+    opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+    [data-overtone-fullscreen-cover-background] img {
+        transition: opacity 0.2s ease-out;
+    }
+}
+/* for PulseSync: END layer a blurred cover below the desktop player and lyrics */
 .FullscreenPlayerDesktop_notification__luD_J {
     inset-block-end: var(--ym-spacer-size-xxl);
 }

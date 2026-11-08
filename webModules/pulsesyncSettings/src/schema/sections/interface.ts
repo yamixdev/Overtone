@@ -101,6 +101,13 @@ export const playerBarSchema = defineSettingsSection({
     title: 'Панель плеера',
     items: [
         {
+            type: 'toggle',
+            key: `${PLAYER_PREFIX}fullscreenCoverBackground`,
+            defaultValue: false,
+            title: 'Фон раскрытого плеера из обложки',
+            description: 'Показывает размытую обложку трека за плеером и текстом песни',
+        },
+        {
             type: 'select',
             key: `${PLAYER_PREFIX}playButtonType`,
             defaultValue: 'yellow',

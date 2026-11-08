@@ -159,6 +159,7 @@ const init = () => {
             TOGGLE_SHUFFLE: "Ctrl+'",
         },
         playerBarEnhancement: {
+            fullscreenCoverBackground: false,
             showCodecInsteadOfQualityMark: true,
             alwaysShowTimestamps: false,
             changeDislikeButtonPos: true,

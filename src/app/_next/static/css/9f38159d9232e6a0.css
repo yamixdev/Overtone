@@ -74,14 +74,20 @@
 }
 .SonataFullscreenControlsDesktop_root__ZCIGk {
     align-items: center;
-    display: flex;
-    gap: var(--ym-spacer-size-xxxl);
-    justify-content: center;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    column-gap: clamp(0.25rem, 1vw, 0.75rem);
 }
-@media only screen and (max-width: 1280px) {
-    .SonataFullscreenControlsDesktop_root__ZCIGk {
-        gap: var(--ym-spacer-size-l);
-    }
+.SonataFullscreenControlsDesktop_root__ZCIGk > .SonataFullscreenControlsDesktop_buttonContainer__SpXWc {
+    flex-wrap: wrap;
+    gap: var(--ym-spacer-size-xxxs);
+    min-width: 0;
+}
+.SonataFullscreenControlsDesktop_root__ZCIGk > .SonataFullscreenControlsDesktop_buttonContainer__SpXWc:first-child {
+    justify-content: flex-end;
+}
+.SonataFullscreenControlsDesktop_root__ZCIGk > .SonataFullscreenControlsDesktop_buttonContainer__SpXWc:last-child {
+    justify-content: flex-start;
 }
 .SonataFullscreenControlsDesktop_sonataButtons__9y89g {
     gap: var(--ym-spacer-size-xs);
@@ -152,3 +158,11 @@
     --yellow-play-button-color: var(--ym-logo-color-primary-player);
 }
 /* for PulseSync: END yellow play button color variable */
+/* for PulseSync: BEGIN soften the yellow accent on the cover controls */
+.SonataFullscreenControlsDesktop_root__ZCIGk.SonataControls_root__w8uqu {
+    --yellow-play-button-color: #c9ab58;
+}
+.SonataFullscreenControlsDesktop_root__ZCIGk.SonataControls_root__w8uqu .SonataFullscreenControlsDesktop_playPauseButtonIcon__IkUNX {
+    color: #231a0c;
+}
+/* for PulseSync: END soften the yellow accent on the cover controls */

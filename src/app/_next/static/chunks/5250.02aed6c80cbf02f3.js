@@ -10268,6 +10268,18 @@
                             advert: n,
                         } = (0, N.g)(),
                         s = (0, re.K)(i);
+                    // for PulseSync: BEGIN read the fullscreen cover background preference
+                    const coverBackgroundKey = 'modSettings.playerBarEnhancement.fullscreenCoverBackground';
+                    const [coverBackgroundEnabled, setCoverBackgroundEnabled] = (0, b.useState)(() => window.nativeSettings?.get(coverBackgroundKey) === !0);
+                    (0, b.useEffect)(
+                        () =>
+                            window.musicDesktop?.pulsesync.settings.onChange?.((key, value) => {
+                                if (key === coverBackgroundKey) setCoverBackgroundEnabled(value === !0);
+                            }),
+                        [],
+                    );
+                    const coverBackgroundUri = coverBackgroundEnabled && l.modal.isOpened ? i?.coverUri : void 0;
+                    // for PulseSync: END read the fullscreen cover background preference
                     (rd(),
                         (0, b.useEffect)(() => {
                             n.isAdvertShown && l.modal.close();
@@ -10286,6 +10298,23 @@
                         closeOnOutsidePress: !1,
                         'data-test-id': $.e8.player.FULLSCREEN_PLAYER_MODAL,
                         children: [
+                            // for PulseSync: BEGIN render a decorative blurred cover behind player and lyrics
+                            coverBackgroundUri &&
+                                (0, h.jsx)('div', {
+                                    'data-overtone-fullscreen-cover-background': '',
+                                    'aria-hidden': !0,
+                                    children: (0, h.jsx)(
+                                        'img',
+                                        {
+                                            src: (0, ei.lU)(coverBackgroundUri, 800),
+                                            alt: '',
+                                            decoding: 'async',
+                                            onLoad: (event) => event.currentTarget.setAttribute('data-loaded', ''),
+                                        },
+                                        coverBackgroundUri,
+                                    ),
+                                }),
+                            // for PulseSync: END render a decorative blurred cover behind player and lyrics
                             (0, h.jsx)('header', {
                                 className: r_().header,
                                 children: (0, h.jsx)(Q.$, {

@@ -13,13 +13,13 @@
     /* for PulseSync: END keep toast controls clickable above the window drag region */
 }
 .NotificationUpdate_message__rLYpW {
+    align-items: center;
+    display: flex;
+    justify-content: space-between;
     /* for PulseSync: BEGIN toast width limits for download progress content */
     max-width: min(42rem, calc(100vw - 2rem));
     min-width: 26rem;
     /* for PulseSync: END toast width limits for download progress content */
-    align-items: center;
-    display: flex;
-    justify-content: space-between;
 }
 .ReleaseNotesModal_root__RSw1p {
     height: 100%;

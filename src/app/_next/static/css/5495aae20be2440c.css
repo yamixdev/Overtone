@@ -3436,10 +3436,10 @@
 }
 @supports selector(scrollbar-width:auto) {
     .MFfv7uDaaJhS_oiAzQNT {
+        scrollbar-gutter: stable;
         /* for PulseSync: BEGIN native scrollbar color override */
         scrollbar-color: var(--ym-controls-color-primary-default-disabled) transparent;
         /* for PulseSync: END native scrollbar color override */
-        scrollbar-gutter: stable;
     }
 }
 @supports selector(::-webkit-scrollbar) {
@@ -4014,11 +4014,6 @@
         background-color var(--ym-duration-transition);
     width: 1rem;
 }
-/* for PulseSync: BEGIN disabled native toggle thumb color */
-.rqUESGQ8jp3tbDawOzuG:disabled .aw9IoPC0GuAC7Hmf825u {
-    background-color: var(--ym-controls-color-secondary-on_default-disabled);
-}
-/* for PulseSync: END disabled native toggle thumb color */
 .rqUESGQ8jp3tbDawOzuG .KC8t9NStVmQ1_VY54KH4 {
     background-color: var(--ym-controls-color-primary-on_default-enabled);
     transform: translateX(var(--ym-spacer-size-m));
@@ -4205,6 +4200,11 @@
     display: -webkit-box; /*! autoprefixer: ignore next */
     -webkit-box-orient: vertical;
 }
+/* for PulseSync: BEGIN disabled native toggle thumb color */
+.rqUESGQ8jp3tbDawOzuG:disabled .aw9IoPC0GuAC7Hmf825u {
+    background-color: var(--ym-controls-color-secondary-on_default-disabled);
+}
+/* for PulseSync: END disabled native toggle thumb color */
 /* for PulseSync: BEGIN disabled native slider background color */
 .JkKcxRVvjK7lcakkEliC:disabled:before {
     background-color: var(--ym-slider-color-primary-disabled);

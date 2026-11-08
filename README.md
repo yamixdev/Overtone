@@ -10,8 +10,8 @@
   <img alt="Яндекс Музыка 5.126.1" src="https://img.shields.io/badge/Yandex_Music-5.126.1-FFCB00?style=flat-square" />
 </p>
 
-Overtone — форк [PulseSync](https://github.com/PulseSync-LLC/PulseSync-mod) для настольной [Яндекс Музыки](https://music.yandex.com/download/).
-В основе проекта — работа команды PulseSync. Я развиваю форк в своём направлении и добавляю то, чего мне не хватает в клиенте.
+Overtone основан на [PulseSync](https://github.com/PulseSync-LLC/PulseSync-mod) для настольной [Яндекс Музыки](https://music.yandex.com/download/).
+Проект опирается на наработки команды PulseSync. Я развиваю форк в своём направлении и добавляю то, чего мне не хватает в клиенте.
 
 > [!CAUTION]
 > ### Данная модификация НЕ даёт возможность пользоваться сервисом БЕЗ подписки Яндекс Плюс!
@@ -191,7 +191,7 @@ https://github.com/user-attachments/assets/079f8b38-ca6b-4fef-b6a2-efa853fd583f
 Добавляет возможность включить повтор трека когда играет **Моя Волна**.
 
 <p align="left">
-	<img width="550" src="https://github.com/user-attachments/assets/85480090-5e19-4ee8-8084-dbb15491451b" alt="Повтор трека в Моей Волне — интерфейс" />
+	<img width="550" src="https://github.com/user-attachments/assets/85480090-5e19-4ee8-8084-dbb15491451b" alt="Кнопка повтора трека в Моей волне" />
 </p>
 
 </details>
@@ -230,8 +230,7 @@ https://github.com/user-attachments/assets/85a009b6-bd41-4018-bf50-81fc0c7584fd
 <details>
    <summary>Подробнее</summary>
 
-Если трек не имеет такста в Яндекс Музыке, то мод будет пытаться найти его в LRCLib. LRCLib — это открытая база текстов
-песен, которая поддерживается сообществом.
+Если у трека нет текста в Яндекс Музыке, мод ищет его в открытой базе текстов песен LRCLib, которую поддерживает сообщество.
 
 Кроме того это позволяет показывать тексты песен для приватных треков, которые вы сами добавили в Яндекс Музыку.
 

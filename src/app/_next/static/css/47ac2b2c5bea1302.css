@@ -675,9 +675,17 @@
     }
 }
 
-@media only screen and (max-width: 53.8rem) {
+.PlayerBarDesktopWithBackgroundProgressBar_root__bpmwN.PlayerBarDesktopWithBackgroundProgressBar_important__HzXrK {
+    container: pulsesync-player-bar / inline-size;
+}
+
+@container pulsesync-player-bar (max-width: 53.8rem) {
+    .PlayerBarDesktopWithBackgroundProgressBar_infoCard__i0cbW {
+        padding-inline-end: var(--ym-spacer-size-xs);
+    }
     .PlayerBarDesktopWithBackgroundProgressBar_meta__FhKTC {
         gap: 0.2rem;
+        padding-inline-start: var(--ym-spacer-size-xs);
     }
     .PlayerBarDesktopWithBackgroundProgressBar_sonataControls__rSmXQ.PlayerBarDesktopWithBackgroundProgressBar_important__HzXrK,
     .PlayerBarDesktopWithBackgroundProgressBar_sonata__mGFb_ {

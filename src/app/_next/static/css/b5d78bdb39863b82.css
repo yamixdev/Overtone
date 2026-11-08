@@ -2957,6 +2957,15 @@
     transition: scrollbar-color 0.2s ease-in-out;
     width: 100%;
 }
+/* for PulseSync: BEGIN fade the queue without painting over the cover background */
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .PlayQueue_root__ponhw::before,
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .PlayQueue_root__ponhw::after {
+    content: none;
+}
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .PlayQueue_content__zIUvd {
+    mask-image: linear-gradient(transparent, black var(--play-queue-content-indent-dvh), black calc(100% - var(--play-queue-content-indent-dvh)), transparent);
+}
+/* for PulseSync: END fade the queue without painting over the cover background */
 .PlayQueue_content__zIUvd::-webkit-scrollbar-thumb {
     background-clip: content-box;
     border: 0.5rem solid transparent;

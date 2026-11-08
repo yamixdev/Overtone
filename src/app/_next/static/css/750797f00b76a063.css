@@ -188,10 +188,20 @@
 .MainPage_vibeWidgetContainer__i5T4X {
     --actions-inline: var(--ym-spacer-size-xxxs);
     --actions-block: var(--ym-spacer-size-m);
+    /* for PulseSync: BEGIN reserve space for wave badges */
+    display: flex;
+    flex-direction: column;
+    /* for PulseSync: END reserve space for wave badges */
     height: 100%;
     position: relative;
     width: 100%;
 }
+/* for PulseSync: BEGIN keep wave badges below the page content */
+.MainPage_vibeWidgetContainer__i5T4X > .VibePage_root__dGvPX {
+    flex: 1 1 0;
+    min-height: 0;
+}
+/* for PulseSync: END keep wave badges below the page content */
 @media only screen and (max-width: 767.98px) {
     .MainPage_vibeWidgetContainer__i5T4X {
         --actions-inline: var(--ym-spacer-size-l);
@@ -224,12 +234,14 @@
     z-index: var(--ym-z-index-header);
 }
 .MainPage_betaSlot_newVibe__DGtXm {
-    inset-block-end: 0;
-    inset-block-start: auto;
-    inset-inline-end: 0;
-    /* for PulseSync: BEGIN allow wave status badges to share the header slot */
+    /* for PulseSync: BEGIN let wave status badges take up space below the player */
     display: flex;
-    /* for PulseSync: END allow wave status badges to share the header slot */
+    flex: 0 0 auto;
+    flex-wrap: wrap;
+    inset: auto;
+    justify-content: flex-end;
+    position: relative;
+    /* for PulseSync: END let wave status badges take up space below the player */
 }
 /* for PulseSync: BEGIN animate updates to the wave quality label */
 .PulseSync_waveQualityLabel {
@@ -4173,10 +4185,27 @@
     display: contents;
 }
 @media only screen and (min-width: 768px) {
+    .VibePlayerBar_root__G3MOe:has(> .PulseSync_waveProgress_improved) {
+        container-type: inline-size;
+    }
     .VibePlayerBar_progress__Cri6E.PulseSync_waveProgress_improved {
-        --pulsesync-wave-side-width: calc(3 * (var(--ym-icon-size-xs) + 2 * var(--ym-spacer-size-m)) + 2 * var(--ym-spacer-size-xxxs));
+        --pulsesync-wave-button-padding: clamp(
+            0.375rem,
+            calc((100cqi - 9.5rem - 6 * (var(--ym-icon-size-xs) + var(--ym-spacer-size-xxxs))) / 12),
+            var(--ym-spacer-size-m)
+        );
+        --pulsesync-wave-side-width: calc(3 * (var(--ym-icon-size-xs) + 2 * var(--pulsesync-wave-button-padding)) + 2 * var(--ym-spacer-size-xxxs));
         display: grid;
         grid-template-columns: var(--pulsesync-wave-side-width) minmax(0, 1fr) var(--pulsesync-wave-side-width);
+    }
+    .PulseSync_waveProgress_improved > .VibePlayerbarTimecodeContent_root__arFLi {
+        grid-area: 1 / 2;
+    }
+    .VibePlayerBar_progress__Cri6E.PulseSync_waveProgress_improved .VibePlayerBar_button__GLhJ_ {
+        padding: var(--pulsesync-wave-button-padding);
+    }
+    .PulseSync_waveProgress_improved .VibePlayerBar_changeVolume__x7FHC {
+        --position-slider-container-inline: calc(-1.125rem + var(--pulsesync-wave-button-padding) - var(--ym-spacer-size-m));
     }
     .PulseSync_waveProgress_improved > .PulseSync_waveSideControls {
         align-items: center;
@@ -4185,24 +4214,12 @@
         min-width: 0;
     }
     .PulseSync_waveProgress_improved > .PulseSync_waveSideControls_left {
+        grid-area: 1 / 1;
         justify-content: flex-start;
     }
     .PulseSync_waveProgress_improved > .PulseSync_waveSideControls_right {
+        grid-area: 1 / 3;
         justify-content: flex-end;
-    }
-}
-@media only screen and (min-width: 768px) and (max-width: 1000px) {
-    .VibePlayerBar_progress__Cri6E.PulseSync_waveProgress_improved {
-        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
-        max-height: none;
-    }
-    .VibePlayerBar_progress__Cri6E.PulseSync_waveProgress_improved > .VibePlayerbarMeta_root___dH5G {
-        grid-column: 1 / -1;
-        grid-row: 1;
-        height: 4rem;
-    }
-    .PulseSync_waveProgress_improved > .PulseSync_waveSideControls {
-        grid-row: 2;
     }
 }
 /* for PulseSync: END Yandex Station cast popover and centered wave progress control layout */

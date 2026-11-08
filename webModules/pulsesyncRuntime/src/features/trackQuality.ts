@@ -136,7 +136,7 @@ export function buildTrackQualityInfo(
     const sourceFormat = format && typeof format === 'object' ? format : {};
     const fallback = fallbackDownloadInfo && typeof fallbackDownloadInfo === 'object' ? fallbackDownloadInfo : {};
     const codec = normalizeCodec(sourceFormat.codec ?? fallback.codec);
-    const bitrateKbits = normalizeBitrate(sourceFormat.bitrate ?? fallback.bitrate);
+    const bitrateKbits = normalizeBitrate(sourceFormat.bitrate) ?? normalizeBitrate(fallback.bitrate);
     const parsedBitsPerSample = normalizeNumber(sourceFormat.bitsPerSample);
     const sampleRate = normalizeNumber(sourceFormat.sampleRate);
     const bitsPerSample = parsedBitsPerSample ?? (codec && !['FLAC', 'ALAC'].includes(codec) ? 16 : null);
@@ -147,6 +147,7 @@ export function buildTrackQualityInfo(
     }
 
     const resolution = bitsPerSample || sampleRate ? `${bitsPerSample ?? '?'}/${formatSampleRate(sampleRate)}` : '';
+    const formatLabel = [codec, resolution, bitrateKbits && `${bitrateKbits} kbits/s`].filter(Boolean).join(' ');
 
     return {
         quality,
@@ -154,7 +155,7 @@ export function buildTrackQualityInfo(
         bitsPerSample,
         sampleRate,
         bitrateKbits,
-        label: `${quality ?? '?'}: ${codec ?? '?'} ${resolution && `${resolution} `}${bitrateKbits ?? '?'} kbits/s`,
+        label: [quality, formatLabel].filter(Boolean).join(': '),
         source: sourceFormat.source ?? null,
         updatedAt: sourceFormat.updatedAt ?? null,
     };

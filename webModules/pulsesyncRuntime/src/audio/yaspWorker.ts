@@ -12,6 +12,7 @@ export function pulseSyncYaspWorkerBootstrap(
     const mode = tapMode === 'stream' ? 'stream' : 'metadata';
     const metadataProbeLimit = Number.isFinite(Number(probeLimit)) ? Number(probeLimit) : 8;
     const feederStates = new WeakMap<object, { feederId: number; currentTrack: unknown; streamGeneration: number }>();
+    const mediaSources = new WeakMap<object, { url: string }>();
     const probeCounts = new Map<string, number>();
     let nextFeederId = 1;
     let nextAppendSequence = 1;
@@ -151,6 +152,10 @@ export function pulseSyncYaspWorkerBootstrap(
     const postMessage = (message: Record<string, unknown>) =>
         worker.postMessage({ [messageMarker]: true, sourceUrl, workerId, ...message });
 
+    worker.__pulseSyncYaspBindMediaSource = (feeder: object, source: { url: string }) => {
+        mediaSources.set(feeder, source);
+    };
+
     worker.__pulseSyncYaspNativeAudioTap = (
         feeder: any,
         stream: any,
@@ -176,6 +181,7 @@ export function pulseSyncYaspWorkerBootstrap(
             }
 
             const mimeTypes = safeRead(() => feeder.timeline.getMimeTypes());
+            const source = mediaSources.get(feeder);
             const mediaState = feeder?.mediaState ?? {};
             const segment = getCurrentSegmentMetadata(feeder, stream);
             const audioTrack = getAudioTrackMetadata(
@@ -190,7 +196,7 @@ export function pulseSyncYaspWorkerBootstrap(
                 tapStage,
                 appendSequence,
                 currentTrack: stream.currentTrack ?? null,
-                sourceIndex: feeder?.sourceIndex ?? null,
+                sourceIndex: (source && safeRead(() => new URL(source.url).searchParams.get('source_index'))) ?? feeder?.sourceIndex ?? null,
                 audioTrack,
                 audioFormat: getAudioFormatMetadata(audioTrack),
                 time: normalizeNumber(stream.time),
@@ -237,19 +243,24 @@ export function pulseSyncYaspWorkerBootstrap(
             .replace(/channels:\s*r\.channels/g, 'channels:r.channels,sampleRate:r.sampleRate');
     const patchWorkerSource = (source: string) => {
         const metadataSource = patchMetadata(source);
+        // The MSE feeder appends chunks, while its owner carries the playback URL and source index.
+        const feederSource = metadataSource.replace(
+            /(,\s*)([A-Za-z_$][\w$]*)\.mseFeeder\.on\(\s*(["'])QuotaExceededError\3/,
+            (match, _separator, owner) => `,self.__pulseSyncYaspBindMediaSource(${owner}.mseFeeder,${owner})${match}`,
+        );
         const marker = /(return\s+e\.next\s*=\s*15\s*,\s*)cf\.race\(\[this\.appendChunk\(t\s*,\s*o\)\s*,\s*n\]\)/;
-        const patched = metadataSource.replace(
+        const patched = feederSource.replace(
             marker,
             '$1(self.__pulseSyncYaspNativeAudioStreamChunkTap&&self.__pulseSyncYaspNativeAudioStreamChunkTap(this,t,o),cf.race([this.appendChunk(t,o),n]))',
         );
 
         postMessage({
             event: 'patch-status',
-            patched: patched !== source,
+            patched: patched !== feederSource,
             reason:
-                patched === source
+                patched === feederSource
                     ? 'appendStream chunk marker not found'
-                    : `appendStream stream-read tap patched, track metadata ${metadataSource === source ? 'not patched' : 'patched'}`,
+                    : `appendStream tap patched, source binding ${feederSource === metadataSource ? 'unavailable' : 'patched'}`,
         });
 
         return patched;

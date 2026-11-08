@@ -142,14 +142,5 @@ export const appUpdatesSchema = defineSettingsSection({
             description: 'Выключает участие в получении обновлений волнами',
             restartRequired: true,
         },
-        {
-            type: 'toggle',
-            key: 'modSettings.appAutoUpdates.enableModAutoUpdate',
-            defaultValue: true,
-            title: 'Проверять обновления модификации',
-            description: 'Проверять ли наличие обновлений мода автоматически',
-            hiddenWhen: (context) => context.platform !== 'win32',
-            restartRequired: true,
-        },
     ],
 });

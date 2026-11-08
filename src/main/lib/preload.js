@@ -271,7 +271,7 @@ const ensureNonPremiumTitlebarBranding = () => {
     const titleBar = window.document.querySelector('[class*="TitleBar_root"]');
     if (!titleBar) return;
 
-    const brandingText = `PulseSync ${config_js_1.config.modification.version}`;
+    const brandingText = `${config_js_1.config.modification.name} ${config_js_1.config.modification.version}`;
 
     let pulseText = titleBar.querySelector('span[class*="TitleBar_pulseText"], .TitleBar_pulseText__FhYv, [class*="TitleBar_pulseText"]');
     if (!pulseText) {
@@ -440,6 +440,7 @@ electron_1.contextBridge.exposeInMainWorld('ENABLE_YNISON_REMOTE_CONTROL', Boole
 electron_1.contextBridge.exposeInMainWorld('YNISON_INTERCEPT_PLAYBACK', Boolean(store_js_1.getYnisonInterceptPlayback()));
 electron_1.contextBridge.exposeInMainWorld('GLOBAL_SHORTCUTS', Boolean(store_js_1.getGlobalShortcuts()));
 electron_1.contextBridge.exposeInMainWorld('PULSE_VERSION', String(config_js_1.config.modification.version));
+electron_1.contextBridge.exposeInMainWorld('MOD_NAME', config_js_1.config.modification.name);
 electron_1.contextBridge.exposeInMainWorld('ENABLED_ADDONS', async () => electron_1.ipcRenderer.invoke('get-enabled-addons'));
 electron_1.contextBridge.exposeInMainWorld('HOST_VERSION', String(config_js_1.config.modification.realYMVersion));
 electron_1.contextBridge.exposeInMainWorld('SHOW_CODEC_INSTEAD_OF_QUALITY_MARK', () =>

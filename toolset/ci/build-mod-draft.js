@@ -105,11 +105,18 @@ async function main() {
     const { REPO_ROOT, SRC_PATH } = core.constants;
     const { asar, semver, sevenZip } = core.runtime.deps;
     const src = JSON.parse(await fsp.readFile(path.join(SRC_PATH, 'package.json'), 'utf8'));
+    const modName = src.modification?.name;
     const modVersion = core.packageUtils.getModVersion();
     const upstream = await core.extractUtils.fetchLatestYmYaml();
     const download = core.extractUtils.resolveYmDownloadInfo(upstream, null);
-    if (!semver.valid(download?.version) || semver.prerelease(download.version) || !download.sha512 || !semver.valid(modVersion)) {
-        throw new Error('Не удалось определить стабильную версию Яндекс Музыки с SHA-512 или версию мода.');
+    if (
+        !semver.valid(download?.version) ||
+        semver.prerelease(download.version) ||
+        !download.sha512 ||
+        !semver.valid(modVersion) ||
+        !/^[A-Za-z0-9-]+$/.test(modName ?? '')
+    ) {
+        throw new Error('Не удалось определить стабильную версию Яндекс Музыки с SHA-512 или данные о модификации.');
     }
     const yandexMusicVersion = download.version;
     if (src.modification?.realYMVersion !== yandexMusicVersion || src.version !== yandexMusicVersion) {
@@ -119,7 +126,7 @@ async function main() {
     }
 
     const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
-    const baseName = `Yandex-Music-${yandexMusicVersion}-PulseSync-${modVersion}-win-x64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`;
+    const baseName = `Yandex-Music-${yandexMusicVersion}-${modName}-${modVersion}-win-x64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`;
     const workspace = await fsp.mkdtemp(path.join(RUNNER_TEMP, 'pulsesync-draft-'));
     const installer = path.join(workspace, 'upstream.exe');
     const stage = path.join(workspace, baseName);
@@ -150,7 +157,7 @@ async function main() {
     await fsp.rename(`${modArchive}.unpacked`, `${appArchive}.unpacked`);
     await smokeTest(executable, path.join(workspace, 'smoke-user-data'), built.appConfig);
 
-    const metadata = { yandexMusicVersion, modVersion, commit, builtAt: new Date().toISOString() };
+    const metadata = { yandexMusicVersion, modName, modVersion, commit, builtAt: new Date().toISOString() };
     await fsp.writeFile(path.join(stage, 'build.json'), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
     const zip = path.join(workspace, `${baseName}.zip`);
     await sevenZip.pack(stage, zip);
@@ -162,7 +169,7 @@ async function main() {
     await fsp.writeFile(
         notes,
         [
-            `Яндекс Музыка **${yandexMusicVersion}** для Windows x64 с PulseSync **${modVersion}**.`,
+            `Яндекс Музыка **${yandexMusicVersion}** для Windows x64 с модификацией **${modName} ${modVersion}**.`,
             '',
             `Коммит мода: \`${commit}\``,
             '',
@@ -173,7 +180,7 @@ async function main() {
     );
     const outputs = {
         tag: `draft-yandex-${yandexMusicVersion}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`,
-        title: `Яндекс Музыка ${yandexMusicVersion} + PulseSync ${modVersion} (Windows x64)`,
+        title: `Яндекс Музыка ${yandexMusicVersion} + ${modName} ${modVersion} (Windows x64)`,
         commit,
         zip,
         checksum,

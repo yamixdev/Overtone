@@ -83,7 +83,9 @@
         "REVOCATION_DEFENSE_ENABLED": false
     },
     "modification": {
-        "version": "2.1.6",
+        "name": "Overtone",
+        "version": "1.0.0",
+        "upstreamUpdatesEnabled": false,
         "realYMVersion": "5.126.1",
         "lastfm": {
             "apikey": "e6c5281b3221cb5d9b6684ec1a5f6f85",

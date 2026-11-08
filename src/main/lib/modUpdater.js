@@ -24,6 +24,7 @@ const APP_ASAR_TMP_DOWNLOAD_PATH = path.join(electron.app.getAppPath(), '../../'
 const APP_ASAR_TMP_ZSTD_DOWNLOAD_PATH = path.join(electron.app.getAppPath(), '../../', 'temp\\app.asar.zst');
 const TMP_PATH = path.join(electron.app.getAppPath(), '../../', '\\temp');
 const currentVersion = config_js_1.config.modification.version;
+const upstreamUpdatesEnabled = config_js_1.config.modification.upstreamUpdatesEnabled !== false;
 
 class ModUpdater {
     updaterId = null;
@@ -46,6 +47,7 @@ class ModUpdater {
     }
 
     start() {
+        if (!upstreamUpdatesEnabled) return;
         this.check();
         this.updaterId = setInterval(() => {
             this.check();
@@ -92,6 +94,7 @@ class ModUpdater {
     }
 
     async checkForUpdates(force = false) {
+        if (!upstreamUpdatesEnabled) return false;
         if (this.branch) return this.checkForBranchUpdates(force);
 
         const response = await fetch(UPDATE_CHECK_URL, { signal: AbortSignal.timeout(15000) });
@@ -279,6 +282,7 @@ class ModUpdater {
     }
 
     async onUpdateDownload(callback) {
+        if (!upstreamUpdatesEnabled) return;
         if (!fs.existsSync(TMP_PATH)) {
             await fsPromise.mkdir(TMP_PATH);
             this.logger.log('Created temp directory.');
@@ -290,6 +294,7 @@ class ModUpdater {
     }
 
     async onInstallUpdate() {
+        if (!upstreamUpdatesEnabled) return;
         this.logger.log('Installing update...');
         try {
             await this.openPatcher(this.branch ? APP_ASAR_TMP_ZSTD_DOWNLOAD_PATH : APP_ASAR_TMP_DOWNLOAD_PATH);

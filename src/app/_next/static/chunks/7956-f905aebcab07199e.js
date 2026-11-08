@@ -754,7 +754,9 @@
                             (0, a.jsxs)(a.Fragment, {
                                 children: [
                                     // for PulseSync: BEGIN titlebar mod version, settings, mini-player and minimize controls
-                                    !w && (0, a.jsx)('span', { className: c().pulseText, children: 'PulseSync '.concat(window.PULSE_VERSION) }),
+                                    // for PulseSync: BEGIN display fork name and version in the title bar
+                                    !w && (0, a.jsx)('span', { className: c().pulseText, children: `${window.MOD_NAME} ${window.PULSE_VERSION}` }),
+                                    // for PulseSync: END display fork name and version in the title bar
                                     (0, a.jsx)(h, {
                                         onClick: onPulseSyncSettingsOpen,
                                         ariaLabel: 'Настройки мода',

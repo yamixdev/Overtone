@@ -67,12 +67,14 @@ const createContextMenu = (window) => {
         },
         {
             label: 'Проверить обновления мода',
+            visible: config_js_1.config.modification.upstreamUpdatesEnabled !== false,
             click() {
                 modUpdater.check();
             },
         },
         {
             label: 'Переустановить мод',
+            visible: config_js_1.config.modification.upstreamUpdatesEnabled !== false,
             click() {
                 modUpdater.check(true);
             },

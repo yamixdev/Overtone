@@ -12175,15 +12175,22 @@
                         S = (0, f.c)(() => {
                             (t ? x.cancel() : a(), x());
                         });
-                    ((0, b.useEffect)(
-                        () => (
-                            window.addEventListener('mousemove', S),
-                            () => {
-                                window.removeEventListener('mousemove', S);
-                            }
-                        ),
-                        [S],
-                    ),
+                    // for PulseSync: BEGIN keep clip controls visible after pointer and keyboard activity
+                    ((0, b.useEffect)(() => {
+                        if (!e.modal.isOpened) return;
+                        S();
+                        window.addEventListener('pointermove', S);
+                        window.addEventListener('pointerdown', S);
+                        window.addEventListener('keydown', S);
+                        return () => {
+                            window.removeEventListener('pointermove', S);
+                            window.removeEventListener('pointerdown', S);
+                            window.removeEventListener('keydown', S);
+                            x.cancel();
+                            C.cancel();
+                        };
+                    }, [e.modal.isOpened, S, x, C]),
+                        // for PulseSync: END keep clip controls visible after pointer and keyboard activity
                         (0, b.useEffect)(() => {
                             t || n();
                         }, [n, t]));
@@ -12558,6 +12565,9 @@
                             children: [
                                 (0, h.jsxs)('header', {
                                     className: oJ().header,
+                                     // for PulseSync: BEGIN mark active clip playback for titlebar and header styling
+                                     'data-pulsesync-clip-open': v ? '' : void 0,
+                                     // for PulseSync: END mark active clip playback for titlebar and header styling
                                     children: [
                                         (0, h.jsx)(Q.$, {
                                             className: oJ().closeButton,

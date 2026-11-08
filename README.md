@@ -1,25 +1,25 @@
-# PulseSync-mod
+<h1 align="center">Overtone</h1>
 
-[![OS - Windows](https://img.shields.io/badge/OS-Windows-blue)](https://pulsesync.dev "Download") [![OS - MacOS](https://img.shields.io/badge/OS-Mac-blue)](https://pulsesync.dev "Download") [![OS - MacOS](https://img.shields.io/badge/OS-Linux-blue)](https://pulsesync.dev "Download")
-
-<p align="left">
-	<a href="https://discord.gg/7kvrMavsX6">
-      <img width="113" alt="Сервер" src="https://github.com/user-attachments/assets/b7c8a272-b48c-411f-aca3-6512086a9a18">
-   </a>
+<p align="center">
+  <img alt="Windows" src="https://img.shields.io/badge/Windows-0078D4?style=flat-square&amp;logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZiIgZD0iTTAgMGgxMXYxMUgwem0xMyAwaDExdjExSDEzek0wIDEzaDExdjExSDB6bTEzIDBoMTF2MTFIMTN6Ii8%2BPC9zdmc%2B" />
+  <img alt="macOS" src="https://img.shields.io/badge/macOS-1C1C1E?style=flat-square&amp;logo=apple&amp;logoColor=white" />
+  <img alt="Linux" src="https://img.shields.io/badge/Linux-FCC624?style=flat-square&amp;logo=linux&amp;logoColor=black" />
+  <br />
+  <img alt="Overtone 1.0.0" src="https://img.shields.io/badge/Overtone-1.0.0-6153CC?style=flat-square" />
+  <img alt="Electron 38.2.2" src="https://img.shields.io/badge/Electron-38.2.2-47848F?style=flat-square&amp;logo=electron&amp;logoColor=white" />
+  <img alt="Яндекс Музыка 5.126.1" src="https://img.shields.io/badge/Yandex_Music-5.126.1-FFCB00?style=flat-square" />
 </p>
 
-### Это модификация для [настольного приложения Яндекс Музыка](https://music.yandex.com/download/), главная задача которой — добавить недостающие ванильному клиенту функции.
+Overtone — форк [PulseSync](https://github.com/PulseSync-LLC/PulseSync-mod) для настольной [Яндекс Музыки](https://music.yandex.com/download/).
+В основе проекта — работа команды PulseSync. Я развиваю форк в своём направлении и добавляю то, чего мне не хватает в клиенте.
 
 > [!CAUTION]
 > ### Данная модификация НЕ даёт возможность пользоваться сервисом БЕЗ подписки Яндекс Плюс!
 
 ## Установка
 
-0. Загрузите последнюю версию клиента Яндекс музыки с официального сайта https://music.yandex.com/download/.
-1. Скачайте и установите PulseSync Client с сайта https://pulsesync.dev/ следуя его порядку установки.
-2. Запустите PulseSync Client и нажмите в нём "Установить мод".
-3. Дождитесь окончания установки.
-4. Готово!
+1. Найдите ZIP нужной версии для Windows x64 в артефактах [сборок Overtone](https://github.com/yamixdev/PulseSync-mod/actions/workflows/build-mod-draft.yml).
+2. Распакуйте ZIP целиком и запустите `Яндекс Музыка.exe` из распакованной папки.
 
 ## Возможности
 
@@ -337,7 +337,7 @@ _Диапазон масштабов: 75% - 200%._
 1. Склонируйте проект:
 
 ```cmd
-git clone https://github.com/PulseSync-LLC/PulseSync-mod
+git clone https://github.com/yamixdev/PulseSync-mod
 ```
 
 2. Установите зависимости:

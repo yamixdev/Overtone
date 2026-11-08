@@ -421,6 +421,8 @@ function createExtractUtils(runtime) {
     return {
         fetchLatestYmYaml,
         resolveYmDownloadInfo,
+        downloadFile,
+        calcSha512Base64,
         downloadAndExtractYm,
         getLatestExtractedSrcDir,
         getLatestExtractedVersion,

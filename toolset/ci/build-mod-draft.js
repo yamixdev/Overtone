@@ -1,0 +1,194 @@
+const fs = require('node:fs');
+const fsp = require('node:fs/promises');
+const path = require('node:path');
+const { execFileSync, spawn } = require('node:child_process');
+const { createHash } = require('node:crypto');
+const { setTimeout: delay } = require('node:timers/promises');
+const { createToolsetCore } = require('../core.js');
+
+const appExecutableName = 'Яндекс Музыка.exe';
+
+function readManifest(asar, archive) {
+    return JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
+}
+
+async function checkRenderer(webSocketDebuggerUrl) {
+    const socket = new WebSocket(webSocketDebuggerUrl);
+    try {
+        return await new Promise((resolve) => {
+            const timeout = setTimeout(() => resolve(false), 3000);
+            socket.addEventListener('open', () => {
+                socket.send(
+                    JSON.stringify({
+                        id: 1,
+                        method: 'Runtime.evaluate',
+                        params: {
+                            expression: 'document.readyState === "complete" && window.__pulsesyncBridgeInitialized === true',
+                            returnByValue: true,
+                        },
+                    }),
+                );
+            });
+            socket.addEventListener('message', ({ data }) => {
+                const response = JSON.parse(data);
+                if (response.id === 1) {
+                    clearTimeout(timeout);
+                    resolve(response.result?.result?.value === true);
+                }
+            });
+            socket.addEventListener('error', () => {
+                clearTimeout(timeout);
+                resolve(false);
+            });
+        });
+    } finally {
+        socket.close();
+    }
+}
+
+async function smokeTest(executable, userData, appConfig) {
+    let startError;
+    const app = spawn(
+        executable,
+        [`--user-data-dir=${userData}`, '--remote-debugging-address=127.0.0.1', '--remote-debugging-port=0', '--disable-gpu', '--enable-logging=stderr'],
+        { cwd: path.dirname(executable), stdio: 'inherit', windowsHide: true },
+    );
+    app.on('error', (error) => {
+        startError = error;
+    });
+    const devToolsPortFile = path.join(userData, 'DevToolsActivePort');
+    const appUrl = `${appConfig.appProtocol}://${appConfig.appHostname}`;
+
+    try {
+        const deadline = Date.now() + 90_000;
+        while (Date.now() < deadline) {
+            if (startError) throw startError;
+            if (app.exitCode !== null) throw new Error(`Приложение завершилось с кодом ${app.exitCode} до запуска модифицированного окна.`);
+            if (fs.existsSync(devToolsPortFile)) {
+                const [port] = (await fsp.readFile(devToolsPortFile, 'utf8')).split(/\r?\n/);
+                const response = await fetch(`http://127.0.0.1:${port}/json/list`, { signal: AbortSignal.timeout(2000) }).catch(() => null);
+                const targets = response?.ok ? await response.json() : [];
+                const renderer = targets.find(
+                    (target) =>
+                        target.type === 'page' && (target.url === appUrl || target.url.startsWith(`${appUrl}/`)) && typeof target.webSocketDebuggerUrl === 'string',
+                );
+                if (renderer && (await checkRenderer(renderer.webSocketDebuggerUrl))) {
+                    console.log('Окно Яндекс Музыки загрузилось. PulseSync Runtime инициализирован.');
+                    return;
+                }
+            }
+            await delay(750);
+        }
+        throw new Error('Окно Яндекс Музыки с PulseSync Runtime не запустилось за 90 секунд.');
+    } finally {
+        if (app.pid && app.exitCode === null) {
+            execFileSync('taskkill.exe', ['/PID', String(app.pid), '/T', '/F'], { stdio: 'ignore', windowsHide: true });
+        }
+    }
+}
+
+async function hashZip(zipPath) {
+    const hash = createHash('sha256');
+    for await (const chunk of fs.createReadStream(zipPath)) {
+        hash.update(chunk);
+    }
+    return hash.digest('hex');
+}
+
+async function main() {
+    const { GITHUB_OUTPUT, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, RUNNER_TEMP } = process.env;
+    if (process.platform !== 'win32' || process.arch !== 'x64' || !GITHUB_OUTPUT || !RUNNER_TEMP || !/^\d+$/.test(GITHUB_RUN_ID) || !/^\d+$/.test(GITHUB_RUN_ATTEMPT)) {
+        throw new Error('Сборка черновика рассчитана на Windows x64 в GitHub Actions.');
+    }
+
+    const core = await createToolsetCore();
+    const { REPO_ROOT, SRC_PATH } = core.constants;
+    const { asar, semver, sevenZip } = core.runtime.deps;
+    const src = JSON.parse(await fsp.readFile(path.join(SRC_PATH, 'package.json'), 'utf8'));
+    const modVersion = core.packageUtils.getModVersion();
+    const upstream = await core.extractUtils.fetchLatestYmYaml();
+    const download = core.extractUtils.resolveYmDownloadInfo(upstream, null);
+    if (!semver.valid(download?.version) || semver.prerelease(download.version) || !download.sha512 || !semver.valid(modVersion)) {
+        throw new Error('Не удалось определить стабильную версию Яндекс Музыки с SHA-512 или версию мода.');
+    }
+    const yandexMusicVersion = download.version;
+    if (src.modification?.realYMVersion !== yandexMusicVersion || src.version !== yandexMusicVersion) {
+        throw new Error(
+            `Исходники мода основаны на ${src.modification?.realYMVersion ?? 'неизвестной версии'}, стабильная версия Яндекс Музыки — ${yandexMusicVersion}. Требуется порт.`,
+        );
+    }
+
+    const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
+    const baseName = `Yandex-Music-${yandexMusicVersion}-PulseSync-${modVersion}-win-x64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`;
+    const workspace = await fsp.mkdtemp(path.join(RUNNER_TEMP, 'pulsesync-draft-'));
+    const installer = path.join(workspace, 'upstream.exe');
+    const stage = path.join(workspace, baseName);
+    const modArchive = path.join(workspace, 'app.asar');
+    await core.extractUtils.downloadFile(download.downloadUrl, installer, download.size);
+    if ((await core.extractUtils.calcSha512Base64(installer)) !== download.sha512) {
+        throw new Error('SHA-512 скачанного установщика Яндекс Музыки не совпадает с манифестом.');
+    }
+    await sevenZip.unpack(installer, stage);
+
+    const executable = path.join(stage, appExecutableName);
+    const appArchive = path.join(stage, 'resources', 'app.asar');
+    if (!(await fsp.stat(executable)).isFile() || readManifest(asar, appArchive).version !== yandexMusicVersion) {
+        throw new Error('Скачанный установщик не содержит приложение требуемой версии.');
+    }
+
+    await core.buildUtils.build({ destDir: modArchive });
+    const built = readManifest(asar, modArchive);
+    if (built.version !== yandexMusicVersion || built.modification?.realYMVersion !== yandexMusicVersion || built.modification?.version !== modVersion) {
+        throw new Error('Версии в собранном app.asar не совпадают с версиями черновика.');
+    }
+
+    core.integrityUtils.replaceWinAsarIntegrity(executable, appArchive, modArchive);
+    await fsp.copyFile(modArchive, appArchive);
+    if (fs.existsSync(`${appArchive}.unpacked`)) {
+        await fsp.rename(`${appArchive}.unpacked`, path.join(workspace, 'upstream.asar.unpacked'));
+    }
+    await fsp.rename(`${modArchive}.unpacked`, `${appArchive}.unpacked`);
+    await smokeTest(executable, path.join(workspace, 'smoke-user-data'), built.appConfig);
+
+    const metadata = { yandexMusicVersion, modVersion, commit, builtAt: new Date().toISOString() };
+    await fsp.writeFile(path.join(stage, 'build.json'), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');
+    const zip = path.join(workspace, `${baseName}.zip`);
+    await sevenZip.pack(stage, zip);
+    await sevenZip.cmd(['t', zip]);
+    const checksum = `${zip}.sha256`;
+    await fsp.writeFile(checksum, `${await hashZip(zip)}  ${path.basename(zip)}\n`, 'utf8');
+
+    const notes = path.join(workspace, 'release-notes.md');
+    await fsp.writeFile(
+        notes,
+        [
+            `Яндекс Музыка **${yandexMusicVersion}** для Windows x64 с PulseSync **${modVersion}**.`,
+            '',
+            `Коммит мода: \`${commit}\``,
+            '',
+            `Распакуйте ZIP целиком и запустите \`${appExecutableName}\` из распакованной папки.`,
+            '',
+        ].join('\n'),
+        'utf8',
+    );
+    const outputs = {
+        tag: `draft-yandex-${yandexMusicVersion}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`,
+        title: `Яндекс Музыка ${yandexMusicVersion} + PulseSync ${modVersion} (Windows x64)`,
+        commit,
+        zip,
+        checksum,
+        notes,
+    };
+    await fsp.appendFile(
+        GITHUB_OUTPUT,
+        Object.entries(outputs)
+            .map(([name, value]) => `${name}=${value}\n`)
+            .join(''),
+        'utf8',
+    );
+}
+
+main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+});

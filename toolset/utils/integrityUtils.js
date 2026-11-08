@@ -45,7 +45,7 @@ function createIntegrityUtils(runtime) {
         }
     }
 
-    function updateIntegrityHashInExeRcData(exePath, newHash) {
+    function updateIntegrityHashInExeRcData(exePath, newHash, expectedHash) {
         const rawBuf = fs.readFileSync(exePath);
         const marker = Buffer.from('"file":"resources\\\\app.asar"', 'utf8');
         const markerIdx = rawBuf.indexOf(marker);
@@ -63,6 +63,9 @@ function createIntegrityUtils(runtime) {
 
         const entry = arr.find((item) => item && typeof item.file === 'string' && item.file.replace(/\\\\/g, '\\').toLowerCase() === 'resources\\app.asar');
         if (!entry) throw new Error('Запись resources\\app.asar не найдена в RCDATA integrity JSON');
+        if (expectedHash && (entry.alg !== 'SHA256' || entry.value !== expectedHash)) {
+            throw new Error('Хеш исходного app.asar не совпадает с RCDATA integrity JSON.');
+        }
 
         entry.value = newHash;
         const newJson = JSON.stringify(arr);
@@ -72,6 +75,12 @@ function createIntegrityUtils(runtime) {
 
         Buffer.from(newJson, 'utf8').copy(rawBuf, startIdx);
         fs.writeFileSync(exePath, rawBuf);
+    }
+
+    function replaceWinAsarIntegrity(exePath, originalArchive, replacementArchive) {
+        const originalHash = calcASARHeaderHash(originalArchive).hash;
+        const replacementHash = calcASARHeaderHash(replacementArchive).hash;
+        updateIntegrityHashInExeRcData(exePath, replacementHash, originalHash);
     }
 
     function updateIntegrityHashInExeLegacy(exePath, oldHexStr, newHexStr) {
@@ -200,6 +209,7 @@ function createIntegrityUtils(runtime) {
         setOldYMHashOverride,
         rememberCurrentAsarHash,
         calcASARHeaderHash,
+        replaceWinAsarIntegrity,
         dumpEntitlements,
         checkIfElectronAsarIntegrityIsUsed,
         checkIfSystemIntegrityProtectionEnabled,

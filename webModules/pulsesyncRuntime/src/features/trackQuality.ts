@@ -9,6 +9,7 @@ const qualityMap: Record<string, string> = {
     hqplus: 'HQ+',
     lossless: 'HQ+',
 };
+const YASP_FORMAT_CACHE_LIMIT = 16;
 
 function normalizeCodec(value: unknown) {
     const raw = String(value ?? '')
@@ -94,12 +95,18 @@ function normalizeRank(format: TrackFormat, fallback: TrackFormat, bitrateKbits:
 
 function getCurrentTrackSource(player?: PulseSyncPlayer | null) {
     const entity = player?.state?.queueState?.currentEntity?.value?.entity;
+    const mediaSource = entity?.mediaSourceData;
 
     return {
         entity,
         trackId: entity?.data?.meta?.id,
-        downloadInfo: (entity?.mediaSourceData?.data ?? null) as TrackFormat | null,
+        sourceIndex: normalizeSourceIndex(mediaSource?.sourceIndex),
+        downloadInfo: (mediaSource?.data ?? null) as TrackFormat | null,
     };
+}
+
+function normalizeSourceIndex(value: unknown) {
+    return typeof value === 'number' || (typeof value === 'string' && value !== '') ? String(value) : null;
 }
 
 function canUseYaspFormat(downloadInfo: TrackFormat | null) {
@@ -111,10 +118,15 @@ function canUseYaspFormat(downloadInfo: TrackFormat | null) {
     );
 }
 
-function selectYaspFormat(format: TrackFormat | null, downloadInfo: TrackFormat | null) {
+function selectYaspFormat(format: TrackFormat | null, downloadInfo: TrackFormat | null, sourceIndex: string | null) {
     const codec = normalizeCodec(format?.codec ?? format?.mimeType);
 
-    return canUseYaspFormat(downloadInfo) && codec === normalizeCodec(downloadInfo?.codec) ? format : null;
+    return sourceIndex !== null &&
+        sourceIndex === normalizeSourceIndex(format?.sourceIndex) &&
+        canUseYaspFormat(downloadInfo) &&
+        codec === normalizeCodec(downloadInfo?.codec)
+        ? format
+        : null;
 }
 
 export function buildTrackQualityInfo(
@@ -163,25 +175,63 @@ function subscribeToCurrentTrack(
     listener: (info: TrackQualityInfo | null, trackId: unknown) => void,
 ) {
     let current = getCurrentTrackSource(player);
-    let format: TrackFormat | null = null;
-    let revision = 0;
+    const formatsBySource = new Map<string, TrackFormat>();
+    let lastFormatSourceIndex: string | null = null;
+    let receivedFormatEvent = false;
+    let disposed = false;
     let retry: ReturnType<typeof setInterval> | undefined;
-    const publish = () =>
+    const publish = () => {
+        const format = current.sourceIndex === null ? null : (formatsBySource.get(current.sourceIndex) ?? null);
+
         listener(
-            buildTrackQualityInfo(selectYaspFormat(format, current.downloadInfo), current.downloadInfo),
+            buildTrackQualityInfo(
+                selectYaspFormat(format, current.downloadInfo, current.sourceIndex),
+                current.downloadInfo,
+            ),
             current.trackId,
         );
+    };
     const readSource = () => {
         const next = getCurrentTrackSource(player);
 
-        if (next.entity === current.entity && next.downloadInfo === current.downloadInfo) {
+        if (
+            next.entity === current.entity &&
+            next.downloadInfo === current.downloadInfo &&
+            next.sourceIndex === current.sourceIndex
+        ) {
             return;
         }
 
         current = next;
-        format = null;
-        revision++;
         publish();
+    };
+    const updateFormat = (format: TrackFormat | null) => {
+        const sourceIndex = normalizeSourceIndex(format?.sourceIndex);
+
+        if (!format && lastFormatSourceIndex !== null) {
+            formatsBySource.delete(lastFormatSourceIndex);
+
+            if (lastFormatSourceIndex === current.sourceIndex) {
+                publish();
+            }
+        } else if (format && sourceIndex !== null) {
+            formatsBySource.delete(sourceIndex);
+            formatsBySource.set(sourceIndex, format);
+
+            if (formatsBySource.size > YASP_FORMAT_CACHE_LIMIT) {
+                const oldest = formatsBySource.keys().next();
+
+                if (!oldest.done) {
+                    formatsBySource.delete(oldest.value);
+                }
+            }
+
+            if (sourceIndex === current.sourceIndex) {
+                publish();
+            }
+        }
+
+        lastFormatSourceIndex = sourceIndex;
     };
     const refresh = () => {
         clearInterval(retry);
@@ -201,47 +251,22 @@ function subscribeToCurrentTrack(
     const unsubscribeTrack = player?.state?.queueState?.currentEntity?.onChange?.(refresh);
     const unsubscribePlayback = player?.state?.playerState?.status?.onChange?.(refresh);
     const unsubscribeFormat = window.musicDesktop?.pulsesync.audio.onFormatChanged?.((value) => {
-        revision++;
+        receivedFormatEvent = true;
         readSource();
-
-        if (!canUseYaspFormat(current.downloadInfo)) {
-            return;
-        }
-
-        const nextFormat = selectYaspFormat(value as TrackFormat | null, current.downloadInfo);
-
-        if (value && !nextFormat) {
-            return;
-        }
-
-        format = nextFormat;
-        publish();
+        updateFormat(value as TrackFormat | null);
     });
 
     refresh();
     publish();
 
-    if (canUseYaspFormat(current.downloadInfo)) {
-        const initialRevision = revision;
-
-        void readYaspAudioFormat().then((value) => {
-            if (initialRevision !== revision) {
-                return;
-            }
-
-            readSource();
-
-            if (initialRevision !== revision) {
-                return;
-            }
-
-            format = value;
-            publish();
-        });
-    }
+    void readYaspAudioFormat().then((value) => {
+        if (!disposed && !receivedFormatEvent) {
+            updateFormat(value);
+        }
+    });
 
     return () => {
-        revision++;
+        disposed = true;
         clearInterval(retry);
         unsubscribeTrack?.();
         unsubscribePlayback?.();
@@ -279,11 +304,15 @@ export function installTrackQualityApi() {
             const format = await readYaspAudioFormat();
             const current = getCurrentTrackSource(player);
 
-            if (current.entity !== initial.entity || current.downloadInfo !== initial.downloadInfo) {
+            if (
+                current.entity !== initial.entity ||
+                current.downloadInfo !== initial.downloadInfo ||
+                current.sourceIndex !== initial.sourceIndex
+            ) {
                 return updateFromFormat(null, current.downloadInfo);
             }
 
-            return updateFromFormat(selectYaspFormat(format, downloadInfo), downloadInfo);
+            return updateFromFormat(selectYaspFormat(format, downloadInfo, current.sourceIndex), downloadInfo);
         },
         getCurrentLabel: async (fallback = null) =>
             (await window.PulseSyncTrackQuality?.getCurrentInfo(fallback))?.label ?? null,

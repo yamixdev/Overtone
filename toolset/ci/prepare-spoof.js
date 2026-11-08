@@ -68,12 +68,9 @@ async function main() {
                     },
                 });
                 if (!response.ok && response.status !== 404) throw new Error(`Failed to check existing release: ${response.status}`);
-                if (response.ok && !(await response.json()).draft) {
-                    console.log(`Release ${tag} is already published; skipping duplicate event.`);
-                    output({ publish: 'false' });
-                    return;
-                }
-                output({ publish: 'true', ref, release_tag: tag });
+                const published = response.ok && !(await response.json()).draft;
+                if (published) console.log(`Release ${tag} is already published.`);
+                output({ publish: String(!published), build_dev: String(ref === devBase), ref, release_tag: tag });
                 return;
             }
         }

@@ -704,6 +704,24 @@ function createBuildUtils(runtime, { packageUtils, extractUtils, integrityUtils,
         }
 
         const resolvedDest = destDir ?? deriveOutputDir(resolvedSrc, '@pretty');
+        const containsPath = (left, right) => {
+            const relative = path.relative(left, right);
+            return !path.isAbsolute(relative) && relative !== '..' && !relative.startsWith(`..${path.sep}`);
+        };
+        const realSrc = await fsp.realpath(resolvedSrc);
+        const realDest = await fsp.realpath(resolvedDest).catch((error) => {
+            if (error.code !== 'ENOENT') throw error;
+            return path.resolve(resolvedDest);
+        });
+        if (
+            containsPath(resolvedSrc, resolvedDest) ||
+            containsPath(resolvedDest, resolvedSrc) ||
+            containsPath(realSrc, realDest) ||
+            containsPath(realDest, realSrc)
+        ) {
+            throw new Error('Каталоги --src и --dest для pretty должны быть раздельными.');
+        }
+
         console.log('Форматирование через Oxfmt');
         console.time('Форматирование завершено');
 

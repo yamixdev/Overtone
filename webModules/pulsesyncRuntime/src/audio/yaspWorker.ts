@@ -190,6 +190,7 @@ export function pulseSyncYaspWorkerBootstrap(
                 tapStage,
                 appendSequence,
                 currentTrack: stream.currentTrack ?? null,
+                sourceIndex: feeder?.sourceIndex ?? null,
                 audioTrack,
                 audioFormat: getAudioFormatMetadata(audioTrack),
                 time: normalizeNumber(stream.time),

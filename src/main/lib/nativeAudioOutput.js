@@ -823,6 +823,7 @@ const getYaspAudioFormatSignature = (format) => {
         source: format.source ?? null,
         lossless: format.lossless ?? null,
         currentTrack: format.currentTrack ?? null,
+        sourceIndex: format.sourceIndex ?? null,
         workerId: format.workerId ?? null,
         feederId: format.feederId ?? null,
         streamGeneration: format.streamGeneration ?? null,
@@ -1944,6 +1945,7 @@ const receiveYaspChunk = (payload = {}, chunk) => {
         const nextYaspAudioFormat = {
             ...audioFormat,
             currentTrack: payload?.meta?.currentTrack ?? null,
+            sourceIndex: payload?.meta?.sourceIndex ?? null,
             sourceHash: hashValue(payloadSourceKey),
             workerId: payload?.workerId || payload?.meta?.workerId || null,
             feederId: payload?.meta?.feederId ?? null,

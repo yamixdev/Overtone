@@ -132,10 +132,8 @@ const init = () => {
             showAlbum: true,
             showVersion: true,
             overrideDeepLinksExperiment: false,
-            showGitHubButton: true,
             afkTimeout: 15,
             reconnectInterval: 30,
-            hideBranding: false,
         },
 
         taskBarExtensions: {

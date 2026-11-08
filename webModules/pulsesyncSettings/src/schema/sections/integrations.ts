@@ -19,25 +19,6 @@ export const discordRpcSchema = defineSettingsSection({
         },
         {
             type: 'toggle',
-            key: `${DISCORD_PREFIX}hideBranding`,
-            defaultValue: false,
-            title: 'Скрыть брендинг PulseSync в статусе',
-            requiresPremium: true,
-            displayValue: (value, context) => value && context.premium.value,
-            disabledWhen: discordDisabled,
-            badge: (context) => ({
-                label: 'Basic',
-                disabled: discordDisabled(context) || !context.premium.value,
-                tooltip: {
-                    title: 'Премиум функция',
-                    description: context.premium.value
-                        ? 'У вас есть подписка Basic'
-                        : 'Оформите Basic подписку, чтобы разблокировать',
-                },
-            }),
-        },
-        {
-            type: 'toggle',
             key: `${DISCORD_PREFIX}fromYnison`,
             defaultValue: false,
             title: 'Использовать Ynison',
@@ -123,17 +104,6 @@ export const discordRpcSchema = defineSettingsSection({
             title: 'Объединить веб и апп ссылки в одну',
             description: 'Уберёт ссылку открывающую приложение т.к. это сделает ссылка на сайт',
             disabledWhen: (context) => discordDisabled(context) || !context.getBoolean(SHOW_BUTTONS_KEY),
-        },
-        {
-            type: 'toggle',
-            key: `${DISCORD_PREFIX}showGitHubButton`,
-            defaultValue: true,
-            title: 'Отображать кнопку на сайт PulseSync',
-            description: 'Отображает кнопку установки мода',
-            disabledWhen: (context) =>
-                discordDisabled(context) ||
-                !context.getBoolean(SHOW_BUTTONS_KEY) ||
-                !context.getBoolean(OVERRIDE_DEEP_LINKS_KEY),
         },
         {
             type: 'slider',

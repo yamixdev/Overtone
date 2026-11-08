@@ -3,10 +3,8 @@ Object.defineProperty(exports, '__esModule', { value: true });
 const Logger_js_1 = require('../packages/logger/Logger.js');
 const store_js_1 = require('./store.js');
 const { throttle } = require('./utils.js');
-const config_js_1 = require('../config.js');
 const DiscordRPC = require('@xhayper/discord-rpc');
 const discordRichPresenceLogger = new Logger_js_1.Logger('DiscordRichPresence');
-const pulseSyncManager_js_1 = require('./pulsesync/PulseSyncManager.js');
 
 class convertableLink {
     constructor(link) {
@@ -31,7 +29,6 @@ class convertableLink {
 const settings = () => store_js_1.get('modSettings.discordRPC') ?? {};
 
 const clientId = settings()?.applicationIDForRPC ?? '1124055337234858005';
-const WEB_LINK = 'https://pulsesync.dev';
 const SET_ACTIVITY_TIMEOUT_MS = 3000;
 const STATUS_DISPLAY_TYPES = {
     0: 0, // Name
@@ -56,7 +53,6 @@ let lastActivity = undefined;
 
 let activityRevision = 0;
 let activityOperationQueue = Promise.resolve();
-let subscribedPulseSyncManager;
 
 const tryConnect = async (client) => {
     connectingRpc = client;
@@ -167,14 +163,6 @@ const initRPC = () => {
         discordRichPresenceLogger.error('Error', e);
     });
 
-    const manager = pulseSyncManager_js_1.getPulseSyncManager();
-    if (manager !== subscribedPulseSyncManager) {
-        subscribedPulseSyncManager?.removeListener('disconnected', sendCurrentActivity);
-        subscribedPulseSyncManager?.removeListener('connected', sendCurrentActivity);
-        manager.on('disconnected', sendCurrentActivity);
-        manager.on('connected', sendCurrentActivity);
-        subscribedPulseSyncManager = manager;
-    }
     return client;
 };
 
@@ -506,10 +494,6 @@ function buildActivityObject(playingState, rpcSettings) {
         endTimestamp = undefined;
     }
 
-    const isPremiumUser = Boolean(pulseSyncManager_js_1.getPulseSyncManager()?.isPremiumUser);
-
-    const hideBranding = Boolean(rpcSettings.hideBranding) && isPremiumUser;
-
     let activityObject = {
         type: 2,
         statusDisplayType: STATUS_DISPLAY_TYPES[rpcSettings.statusDisplayType] ?? 0,
@@ -518,8 +502,6 @@ function buildActivityObject(playingState, rpcSettings) {
         state: string2Discord(artist),
         stateUrl: shareArtistPath.toWeb(),
         largeImageKey: albumArt,
-        largeImageText: !hideBranding && `PulseSync Mod ${config_js_1.config.modification.version}`,
-        largeImageUrl: WEB_LINK,
         startTimestamp,
         endTimestamp,
         instance: false,
@@ -546,17 +528,6 @@ function buildActivityObject(playingState, rpcSettings) {
                 {
                     label: 'Listen in Yandex Music Web',
                     url: shareTrackPath.toWeb(),
-                },
-            ];
-        } else if (rpcSettings.showGitHubButton ?? true) {
-            activityObject.buttons = [
-                {
-                    label: 'Listen on Yandex Music',
-                    url: shareTrackPath.toWeb(),
-                },
-                {
-                    label: 'Install mod',
-                    url: WEB_LINK,
                 },
             ];
         } else {

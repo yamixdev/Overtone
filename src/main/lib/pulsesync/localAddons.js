@@ -4,17 +4,34 @@ const { createHash } = require('node:crypto');
 const fs = require('node:fs/promises');
 const path = require('node:path');
 const { fromBufferPromise } = require('yauzl');
-const { normalizeCanonicalSnapshot, validateAddonId } = require('./isolatedAddonExecution.js');
+const { LOCAL_ADDON_PREFIX, isLocalAddonId, normalizeCanonicalSnapshot, validateAddonId } = require('./isolatedAddonExecution.js');
+const { acceptsValue, readLocalAddonSettings } = require('./localAddonSettings.js');
 const { validateWebHostRequirements } = require('./webHostRequirements.js');
 
-const LOCAL_ADDON_PREFIX = 'overtone-local:';
 const MAX_ARCHIVE_BYTES = 24 * 1024 * 1024;
 const MAX_STORE_BYTES = 24 * 1024 * 1024;
 const MAX_ASSET_BYTES = 2 * 1024 * 1024;
 const MAX_ADDONS = 32;
 const EMPTY_ASSETS = Object.freeze([]);
 
-const isLocalAddonId = (id) => typeof id === 'string' && id.startsWith(LOCAL_ADDON_PREFIX);
+function readAllowedUrls(value) {
+    if (value === undefined) return [];
+    if (!Array.isArray(value) || value.length > 64) throw new Error('Некорректный список сетевых разрешений в metadata.json.');
+    return [
+        ...new Set(
+            value.map((entry) => {
+                try {
+                    if (typeof entry !== 'string' || entry.length > 1024) throw new TypeError();
+                    const url = new URL(entry);
+                    if (url.protocol !== 'https:' || url.username || url.password || url.hash) throw new TypeError();
+                    return url.href;
+                } catch {
+                    throw new Error('Сетевые разрешения модификации должны содержать HTTPS-адреса без логина, пароля и фрагмента.');
+                }
+            }),
+        ),
+    ];
+}
 
 async function readPackage(filePath) {
     if (path.extname(filePath).toLowerCase() !== '.pext') throw new Error('Выберите файл с расширением .pext.');
@@ -65,21 +82,21 @@ async function readPackage(filePath) {
         const metadata = JSON.parse(await readText('metadata.json', 64 * 1024));
         const name = typeof metadata?.name === 'string' ? metadata.name.trim() : '';
         if (!name || name.length > 160) throw new Error('Укажите название модификации в metadata.json.');
-        if (!['theme', 'web-addon'].includes(metadata.type)) throw new Error('Поддерживаются CSS-темы и изолированные WebHost-аддоны.');
+        const type = metadata.type === 'script' ? 'web-addon' : metadata.type;
+        if (!['theme', 'web-addon'].includes(type)) throw new Error('Поддерживаются CSS-темы и изолированные WebHost-аддоны.');
 
         const requirements = validateWebHostRequirements(metadata.requirements);
-        const usesClientFeatures = requirements?.capabilities.some((capability) => ['modules-v1', 'typed-settings-v1', 'net-per-addon-v1'].includes(capability));
-        if (usesClientFeatures || Object.keys(metadata.modules ?? {}).length || metadata.allowedUrls?.length) {
-            throw new Error('Этой модификации нужны модули, настройки или сетевые разрешения PulseSync Client.');
+        if (requirements?.capabilities.includes('modules-v1') || Object.keys(metadata.modules ?? {}).length || metadata.securityManifest) {
+            throw new Error('Этой модификации нужны модули PulseSync Client. Локальная установка модулей пока недоступна.');
         }
 
         const code = metadata.script ? await readText(metadata.script) : '';
-        if (metadata.type === 'theme' && code.trim()) throw new Error('Темы с устаревшими скриптами не поддерживаются.');
-        if (metadata.type === 'web-addon' && !code.includes('__PULSESYNC_ADDON_QUEUE__')) {
-            throw new Error('В пакете отсутствует регистрация изолированного WebHost-аддона.');
+        if (type === 'theme' && code.trim()) throw new Error('Темы с устаревшими скриптами не поддерживаются.');
+        if (type === 'web-addon' && !code.includes('__PULSESYNC_ADDON_QUEUE__')) {
+            throw new Error('Скрипт собран для старого загрузчика PulseSync. Нужна версия аддона для WebHost.');
         }
 
-        const definitionId = metadata.type === 'web-addon' ? validateAddonId(metadata.id) : undefined;
+        const definitionId = type === 'web-addon' ? validateAddonId(metadata.id) : undefined;
         const identity = definitionId ?? (typeof metadata.id === 'string' && metadata.id.trim() ? metadata.id.trim() : name);
         const id = LOCAL_ADDON_PREFIX + createHash('sha256').update(identity).digest('hex');
         const css = metadata.css ? await readText(metadata.css) : '';
@@ -88,17 +105,21 @@ async function readPackage(filePath) {
                 {
                     id,
                     name,
-                    type: metadata.type,
+                    type,
                     version: typeof metadata.version === 'string' ? metadata.version.slice(0, 80) : '',
                     css,
                     code,
+                    allowedUrls: type === 'web-addon' ? readAllowedUrls(metadata.allowedUrls) : [],
                     requirements,
                     cssScope: metadata.cssScope,
                 },
             ],
         });
         if (snapshot.addons.length !== 1) throw new Error('Пакет не прошёл проверку CSS или изолированного JavaScript.');
-        return { ...snapshot.addons[0], ...(definitionId ? { definitionId } : {}) };
+        return {
+            asset: { ...snapshot.addons[0], ...(definitionId ? { definitionId } : {}) },
+            settings: definitionId ? readLocalAddonSettings(metadata.settings) : [],
+        };
     } finally {
         archive.close();
     }
@@ -144,11 +165,33 @@ function createLocalAddonStore(openStore) {
             }
         },
         list() {
-            return read().map(({ asset: { id, name, type, version }, enabled }) => ({ id, name, type, version, enabled }));
+            return read().map(({ asset: { id, name, type, version, allowedUrls }, enabled, settings }) => ({ id, name, type, version, enabled, allowedUrls, settings }));
+        },
+        getSettingsSnapshot() {
+            try {
+                return Object.fromEntries(read().map(({ asset, settings = [] }) => [asset.id, Object.fromEntries(settings.map(({ id, value }) => [id, { value }]))]));
+            } catch {
+                return {};
+            }
+        },
+        setSetting(id, key, value) {
+            const current = read();
+            const record = current.find(({ asset }) => asset.id === id);
+            const setting = record?.settings?.find((item) => item.id === key);
+            if (!setting || !acceptsValue(setting, value)) throw new Error('Недопустимое значение настройки модификации.');
+            if (setting.value === value) return;
+            const settings = record.settings.map((item) => (item === setting ? { ...item, value } : item));
+            save(current.map((item) => (item === record ? { ...record, settings } : item)));
         },
         async import(filePath) {
-            const asset = await readPackage(filePath);
-            save([...read().filter((record) => record.asset.id !== asset.id), { asset, enabled: false }]);
+            const { asset, settings } = await readPackage(filePath);
+            const current = read();
+            const previousSettings = current.find((record) => record.asset.id === asset.id)?.settings ?? [];
+            for (const setting of settings) {
+                const previous = previousSettings.find((item) => item.id === setting.id && item.type === setting.type);
+                if (previous && acceptsValue(setting, previous.value)) setting.value = previous.value;
+            }
+            save([...current.filter((record) => record.asset.id !== asset.id), { asset, settings, enabled: false }]);
         },
         setEnabled(id, enabled) {
             const current = read();

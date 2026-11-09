@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import type { LocalAddon, LocalAddonRequest } from '../../../../shared/musicDesktop';
+import type {
+    LocalAddon,
+    LocalAddonRequest,
+    LocalAddonSetting,
+    LocalAddonSettingValue,
+} from '../../../../shared/musicDesktop';
 import { SettingsSection, type SettingsSchemaItem } from '../../components/settings/SettingsSection';
 
 const getErrorMessage = (error: unknown) =>
@@ -7,12 +12,61 @@ const getErrorMessage = (error: unknown) =>
         ? error.message.replace(/^Error invoking remote method '[^']+': (?:Error: )?/, '')
         : 'Операция не удалась.';
 
+function settingItem(
+    id: string,
+    setting: LocalAddonSetting,
+    disabled: boolean,
+    onChange: (value: LocalAddonSettingValue) => void,
+): SettingsSchemaItem {
+    const props = { title: setting.name, description: setting.description, disabled };
+
+    switch (setting.type) {
+        case 'button':
+            return { id, type: 'toggle', props: { ...props, checked: setting.value, onChange } };
+        case 'slider':
+            return {
+                id,
+                type: 'slider',
+                props: {
+                    ...props,
+                    min: setting.min,
+                    max: setting.max,
+                    step: setting.step,
+                    value: setting.value,
+                    onChange,
+                },
+            };
+        case 'text':
+            return {
+                id,
+                type: 'input',
+                props: { ...props, type: 'text', value: setting.value, placeholder: '', maxLength: 1024, onChange },
+            };
+
+        case 'selector': {
+            const options = setting.options.map(({ label }, index) => ({ label, value: String(index) }));
+
+            return {
+                id,
+                type: 'select',
+                props: {
+                    ...props,
+                    options,
+                    value: String(setting.options.findIndex(({ value }) => value === setting.value)),
+                    onChange: (index) => onChange(setting.options[Number(index)].value),
+                },
+            };
+        }
+    }
+}
+
 export function LocalAddonsSettings() {
     const bridge = window.musicDesktop?.pulsesync.addons;
     const manageLocal = bridge?.manageLocal;
     const [addons, setAddons] = useState<LocalAddon[]>();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
+    const [expandedSettings, setExpandedSettings] = useState<string>();
 
     useEffect(() => {
         if (!bridge || !manageLocal || busy) {
@@ -64,6 +118,38 @@ export function LocalAddonsSettings() {
         }
     };
 
+    const setSetting = async (id: string, key: string, value: LocalAddonSettingValue) => {
+        if (!manageLocal || busy) {
+            return;
+        }
+
+        setError(undefined);
+        setAddons((items) =>
+            items?.map((addon) =>
+                addon.id === id
+                    ? {
+                          ...addon,
+                          settings: addon.settings?.map((setting) =>
+                              setting.id === key ? ({ ...setting, value } as LocalAddonSetting) : setting,
+                          ),
+                      }
+                    : addon,
+            ),
+        );
+
+        try {
+            await manageLocal({ action: 'set-setting', id, key, value });
+        } catch (failure) {
+            setError(getErrorMessage(failure));
+
+            const items = await manageLocal({ action: 'list' }).catch(() => undefined);
+
+            if (items) {
+                setAddons(items);
+            }
+        }
+    };
+
     const items: SettingsSchemaItem[] = [
         {
             id: 'install-pext',
@@ -90,7 +176,7 @@ export function LocalAddonsSettings() {
         });
     }
 
-    for (const { id, name, type, version, enabled, quarantined } of addons ?? []) {
+    for (const { id, name, type, version, enabled, quarantined, allowedUrls, settings } of addons ?? []) {
         items.push({
             id,
             type: 'toggle',
@@ -109,6 +195,44 @@ export function LocalAddonsSettings() {
                     void run(quarantined ? { action: 'retry', id } : { action: 'set-enabled', id, enabled: next }),
             },
         });
+
+        if (allowedUrls?.length) {
+            const hosts = [...new Set(allowedUrls.map((value) => new URL(value).host))];
+
+            items.push({
+                id: `${id}-network`,
+                type: 'note',
+                text: `При включении аддон сможет обращаться к ${hosts.join(', ')}.`,
+            });
+        }
+
+        if (settings?.length) {
+            const expanded = expandedSettings === id;
+
+            items.push({
+                id: `${id}-settings`,
+                type: 'action',
+                props: {
+                    title: `${expanded ? 'Скрыть настройки' : 'Настроить'} «${name}»`,
+                    disabled: busy,
+                    onClick: () => setExpandedSettings(expanded ? undefined : id),
+                },
+            });
+
+            if (expanded) {
+                for (const setting of settings) {
+                    items.push(
+                        settingItem(
+                            `${id}-setting-${setting.id}`,
+                            setting,
+                            busy,
+                            (value) => void setSetting(id, setting.id, value),
+                        ),
+                    );
+                }
+            }
+        }
+
         items.push({
             id: `${id}-remove`,
             type: 'action',

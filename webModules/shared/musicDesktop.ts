@@ -5,6 +5,14 @@ type Subscription<Args extends unknown[]> = (listener: (...args: Args) => void) 
 type Snapshot = Record<string, unknown>;
 type StationResult = { ok?: boolean; reason?: string; [key: string]: unknown };
 
+export type LocalAddonSettingValue = boolean | number | string;
+export type LocalAddonSetting = { id: string; name: string; description: string } & (
+    | { type: 'button'; value: boolean }
+    | { type: 'text'; value: string }
+    | { type: 'slider'; value: number; min: number; max: number; step: number }
+    | { type: 'selector'; value: LocalAddonSettingValue; options: { label: string; value: LocalAddonSettingValue }[] }
+);
+
 export type LocalAddon = {
     id: string;
     name: string;
@@ -12,11 +20,14 @@ export type LocalAddon = {
     version: string;
     enabled: boolean;
     quarantined: boolean;
+    allowedUrls?: string[];
+    settings?: LocalAddonSetting[];
 };
 
 export type LocalAddonRequest =
     | { action: 'list' | 'install' }
     | { action: 'set-enabled'; id: string; enabled: boolean }
+    | { action: 'set-setting'; id: string; key: string; value: LocalAddonSettingValue }
     | { action: 'remove' | 'retry'; id: string };
 
 export type UgcLoudnessTrack = {

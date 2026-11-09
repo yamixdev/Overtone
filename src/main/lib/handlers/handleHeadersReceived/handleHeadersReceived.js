@@ -7,7 +7,7 @@ const framesHandler_js_1 = require('./framesHandler.js');
 const corsHandler_js_1 = require('./corsHandler.js');
 const experimentOverridesHandler_js_1 = require('./remoteExperimentsOverride.js');
 const pulsesyncDevConfig_js_1 = require('../../pulsesyncDevConfig.js');
-const { checkAddonNetworkRequest } = require('../../pulsesync/addonNetworkPolicy.js');
+const { checkAddonNetworkRequest, mayAllowLocalAddonNetworkRequest } = require('../../pulsesync/addonNetworkPolicy.js');
 
 const filter = { urls: ['*://*/*'] };
 const apiFilter = { urls: ['https://api.music.yandex.net/*'] };
@@ -16,6 +16,11 @@ const LASTFM_HOSTS = ['lastfm.freetls.fastly.net', 'www.last.fm', 'last.fm'];
 const LASTFM_PREFIXES = LASTFM_HOSTS.map((host) => `https://${host}/`);
 const LOCAL_PREFIX = 'http://localhost:2007/';
 const FONTS_PREFIX = 'https://fonts.googleapis.com/';
+const APP_ORIGIN = `${config_js_1.config.app.appProtocol}://${config_js_1.config.app.appHostname}`;
+
+function isPlayerMediaRequest(details, origin) {
+    return origin === APP_ORIGIN && details.resourceType === 'media' && ['GET', 'HEAD'].includes(details.method);
+}
 
 function isLastfmUrl(url) {
     return LASTFM_PREFIXES.some((prefix) => url.startsWith(prefix));
@@ -36,17 +41,20 @@ exports.handleHeadersReceived = (window) => {
     const handlers = [corsHandler_js_1.corsHandler, framesHandler_js_1.framesHandler, experimentOverridesHandler_js_1.experimentOverridesHandler];
     const originMap = new Map();
     const responseOriginMap = new Map();
+    const pendingLocalAddonRequests = new Set();
 
     session.webRequest.onBeforeSendHeaders(filter, (details, callback) => {
         const responseOrigin = details.requestHeaders['origin'] || details.requestHeaders['Origin'];
         if (responseOrigin) responseOriginMap.set(details.id, responseOrigin);
         const origin = originMap.get(details.id) || details.requestHeaders['origin'] || details.requestHeaders['Origin'];
-        if (checkAddonNetworkRequest(details.webContentsId, origin, details.url) === false) {
+        const addonAllowed = checkAddonNetworkRequest(details.webContentsId, origin, details.url);
+        const playerMediaAllowed = pendingLocalAddonRequests.has(details.id) && isPlayerMediaRequest(details, origin);
+        if (addonAllowed === false || (pendingLocalAddonRequests.has(details.id) && addonAllowed !== true && !playerMediaAllowed)) {
             callback({ cancel: true });
             return;
         }
         if (origin) originMap.set(details.id, origin);
-        if (origin === `${config_js_1.config.app.appProtocol}://${config_js_1.config.app.appHostname}` && details.url.startsWith('https://lrclib.net/api/')) {
+        if (origin === APP_ORIGIN && details.url.startsWith('https://lrclib.net/api/')) {
             details.requestHeaders['Lrclib-App-Id'] = 'mxbBLMscjQRywVFRLcVkhaVz455sJrgFkhT5CkAJnos';
             details.requestHeaders['Lrclib-Client'] = `PulseSync-Mod v${config_js_1.config.modification.version} (https://github.com/PulseSync-LLC/PulseSync-mod)`;
         }
@@ -55,6 +63,7 @@ exports.handleHeadersReceived = (window) => {
 
     session.webRequest.onBeforeRequest({ urls: ['*://*/*'] }, (details, callback) => {
         const url = details.url;
+        pendingLocalAddonRequests.delete(details.id);
         let protocol = '';
         try {
             protocol = new URL(url).protocol;
@@ -67,6 +76,9 @@ exports.handleHeadersReceived = (window) => {
             return;
         }
         if (isPulseSyncDevServerUrl(url) || url.startsWith(LOCAL_PREFIX) || url.startsWith(FONTS_PREFIX) || isLastfmUrl(url) || corsHandler_js_1.isUrlAllowed(url)) {
+            callback({ cancel: false });
+        } else if (mayAllowLocalAddonNetworkRequest(details.webContentsId, url)) {
+            pendingLocalAddonRequests.add(details.id);
             callback({ cancel: false });
         } else {
             callback({ cancel: true });
@@ -86,10 +98,14 @@ exports.handleHeadersReceived = (window) => {
         const origin = originMap.get(details.id);
 
         const addonAllowed = checkAddonNetworkRequest(details.webContentsId, origin, url);
+        const playerMediaAllowed =
+            pendingLocalAddonRequests.has(details.id) && isPlayerMediaRequest(details, origin) && mayAllowLocalAddonNetworkRequest(details.webContentsId, url);
         if (addonAllowed === true) {
             responseHeaders['access-control-allow-origin'] = [responseOriginMap.get(details.id) || origin];
             responseHeaders['access-control-allow-credentials'] = ['true'];
-        } else if (addonAllowed === false) {
+        } else if (playerMediaAllowed) {
+            responseHeaders['access-control-allow-origin'] = [APP_ORIGIN];
+        } else if (addonAllowed === false || pendingLocalAddonRequests.has(details.id)) {
             callback({ cancel: true });
             return;
         } else if (isPulseSyncDevServerUrl(url)) {
@@ -108,6 +124,7 @@ exports.handleHeadersReceived = (window) => {
     const clearRequest = (details) => {
         originMap.delete(details.id);
         responseOriginMap.delete(details.id);
+        pendingLocalAddonRequests.delete(details.id);
     };
     session.webRequest.onCompleted(filter, clearRequest);
     session.webRequest.onErrorOccurred(filter, clearRequest);

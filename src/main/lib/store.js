@@ -399,6 +399,7 @@ const getStore = (key) => {
     return cloneStoreValue(cachedValue === CACHE_MISS ? store.get(key) : cachedValue);
 };
 exports.get = getStore;
+exports.onDidChange = (key, listener) => store.onDidChange(key, listener);
 
 const setStore = (key, value) => {
     const result = store.set(key, value);

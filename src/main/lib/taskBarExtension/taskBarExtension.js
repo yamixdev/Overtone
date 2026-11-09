@@ -38,6 +38,7 @@ if (!native) {
 }
 
 const settings = store_js_1.getModSettings()?.taskBarExtensions;
+const coverAsThumbnailKey = 'modSettings.taskBarExtensions.coverAsThumbnail';
 let playerState;
 let assets = { dark: {}, light: {} };
 let systemTheme = electron_1.nativeTheme.shouldUseDarkColorsForSystemIntegratedUI ? 'dark' : 'light';
@@ -441,7 +442,7 @@ const taskBarExtension = (window) => {
 
     electron_1.nativeTheme.on('updated', nativeThemeListener);
 
-    if (native) {
+    if (native && (settings?.enable ?? true)) {
         const iconicThumbnail = native.getDWMIconicThumbnailInstance(window);
         iconicThumbnail.onIconicThumbnailRequested = ({ requiresRender = false } = {}) => {
             pushTransitionAnimationDeadline();
@@ -452,6 +453,11 @@ const taskBarExtension = (window) => {
 
             void setIconicThumbnail(playerState, { force: true });
         };
+        const stopWatchingThumbnail = store_js_1.onDidChange(coverAsThumbnailKey, (enabled) => {
+            if (enabled === false) void clearIconicThumbnail();
+            else if (playerState?.track) void setIconicThumbnail(playerState, { force: true });
+        });
+        window.once('closed', stopWatchingThumbnail);
     }
 };
 exports.taskBarExtension = taskBarExtension;
@@ -599,6 +605,7 @@ const getArtist = () => {
 };
 
 const setIconicThumbnail = async (playerState, { force = false, adjacentImageBuffers, currentImageBuffer } = {}) => {
+    if (!native || store_js_1.get(coverAsThumbnailKey) === false) return;
     const nextThumbnailRequestStateKey = getThumbnailRequestStateKey(playerState);
 
     if (!playerState?.track) {
@@ -820,9 +827,7 @@ const updateTaskbarExtension = (window) => {
 
     const nextThumbarStateKey = getThumbarStateKey(playerState);
     if (nextThumbarStateKey === lastThumbarStateKey) {
-        if ((settings?.coverAsThumbnail ?? true) && native) {
-            void setIconicThumbnail(playerState);
-        }
+        void setIconicThumbnail(playerState);
         return;
     }
     const availability = getActionsAvailabilityObject(playerState.availableActions);
@@ -957,9 +962,7 @@ const updateTaskbarExtension = (window) => {
     if (taskButtonStatus) lastThumbarStateKey = nextThumbarStateKey;
     window.setThumbnailToolTip(getTooltipString());
 
-    if ((settings?.coverAsThumbnail ?? true) && native) {
-        void setIconicThumbnail(playerState);
-    }
+    void setIconicThumbnail(playerState);
 
     taskBarExtensionLogger.log('ThumbarButtons set:', taskButtonStatus ? 'success' : 'failed');
 };

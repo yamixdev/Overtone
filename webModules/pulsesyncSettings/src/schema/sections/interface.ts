@@ -69,11 +69,10 @@ export const windowSchema = defineSettingsSection({
             type: 'toggle',
             key: 'modSettings.taskBarExtensions.coverAsThumbnail',
             defaultValue: true,
-            title: 'Использовать обложку трека в превью окна',
-            description: 'Если трек играет, заменяет динамичное превью на картинку обложки трека',
+            title: 'Обложка трека в превью панели задач Windows',
+            description: 'Заменяет миниатюру окна при наведении на значок приложения в панели задач.',
             hiddenWhen: (context) => context.platform !== 'win32',
             disabledWhen: (context) => !context.getBoolean('modSettings.taskBarExtensions.enable'),
-            restartRequired: true,
         },
     ],
 });
@@ -86,7 +85,7 @@ export const playerBarSchema = defineSettingsSection({
             key: `${PLAYER_PREFIX}fullscreenCoverBackground`,
             defaultValue: false,
             title: 'Фон раскрытого плеера из обложки',
-            description: 'Показывает размытую обложку трека за плеером и текстом песни',
+            description: 'Показывает размытую обложку трека за раскрытым плеером, текстом песни и очередью.',
         },
         {
             type: 'select',

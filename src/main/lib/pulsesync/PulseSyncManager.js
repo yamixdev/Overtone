@@ -331,6 +331,7 @@ class PulseSyncManager extends EventEmitter {
             css: addon?.css || '',
             code: addon?.type === 'web-addon' ? addon?.code || '' : '',
             ...(addon?.type === 'web-addon' ? { cssScope: addon.cssScope, requirements: addon.requirements } : {}),
+            ...(isLocalAddonId(addon?.id) ? { allowedUrls: addon.allowedUrls } : {}),
             ...(addon?.securityManifest ? { securityManifest: addon.securityManifest, catalogAddonId: addon.catalogAddonId } : {}),
             ...(addon?.localModules ? { localModules: addon.localModules } : {}),
         });
@@ -1082,10 +1083,10 @@ class PulseSyncManager extends EventEmitter {
 
         this.socket.on('ADDON_SETTINGS_SNAPSHOT', (payload) => {
             const settings = payload?.settings && typeof payload.settings === 'object' && !Array.isArray(payload.settings) ? payload.settings : {};
-            this._addonSettingsSnapshot = this.cloneAddonSettingsValue(settings);
+            this._addonSettingsSnapshot = this.cloneAddonSettingsValue(Object.fromEntries(Object.entries(settings).filter(([id]) => !isLocalAddonId(id))));
             this.window.webContents.send(Events.PULSESYNC_SETTINGS, {
                 type: 'snapshot',
-                settings,
+                settings: this.getAddonSettingsSnapshot(),
             });
         });
 
@@ -1094,6 +1095,7 @@ class PulseSyncManager extends EventEmitter {
                 this.logger.warn('ADDON_SETTINGS_UPDATE: missing addon id');
                 return;
             }
+            if (isLocalAddonId(payload.addon)) return;
 
             const settings = payload.settings && typeof payload.settings === 'object' && !Array.isArray(payload.settings) ? payload.settings : {};
             this._addonSettingsSnapshot = {
@@ -1273,7 +1275,7 @@ class PulseSyncManager extends EventEmitter {
     }
 
     getAddonSettingsSnapshot() {
-        return this.cloneAddonSettingsValue(this._addonSettingsSnapshot);
+        return { ...this.cloneAddonSettingsValue(this._addonSettingsSnapshot), ...localAddons.getSettingsSnapshot() };
     }
 
     getLegacyAssetsSnapshot() {
@@ -1405,6 +1407,7 @@ class PulseSyncManager extends EventEmitter {
 
     publishLocalAddons() {
         if (!this.webContents || this.webContents.isDestroyed()) return;
+        this.webContents.send(Events.PULSESYNC_SETTINGS, { type: 'snapshot', settings: this.getAddonSettingsSnapshot() });
         this.webContents.send(Events.PULSESYNC_WEBHOST_ADDONS, this.getWebHostAddonsSnapshot());
     }
 

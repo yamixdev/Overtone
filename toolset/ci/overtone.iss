@@ -30,6 +30,7 @@ Source: "{#InstallMarker}"; DestDir: "{app}\resources"; Flags: ignoreversion
 
 [Icons]
 Name: "{userprograms}\{#AppShortcutName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExe}"; AppUserModelID: "{#AppIdentity}"
+Name: "{userdesktop}\{#AppShortcutName}"; Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; IconFilename: "{app}\{#AppExe}"; AppUserModelID: "{#AppIdentity}"
 
 [Run]
 Filename: "{app}\{#AppExe}"; WorkingDir: "{app}"; Description: "Запустить Overtone"; Flags: nowait postinstall skipifsilent

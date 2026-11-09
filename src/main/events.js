@@ -1466,6 +1466,15 @@ const registerGlobalApplicationEvents = () => {
         const { action, id } = request ?? {};
         if (action === 'list') return manager.listLocalAddons();
         if (localAddonOperationInProgress) throw new Error('Дождитесь завершения предыдущей операции.');
+        if (action === 'set-setting' && isLocalAddonId(id)) {
+            localAddons.setSetting(id, request.key, request.value);
+            event.sender.send(events_js_1.Events.PULSESYNC_SETTINGS, {
+                type: 'update',
+                addon: id,
+                settings: localAddons.getSettingsSnapshot()[id],
+            });
+            return manager.listLocalAddons();
+        }
 
         localAddonOperationInProgress = true;
         try {

@@ -6,6 +6,8 @@ const { normalizeModuleManifest } = require('./addonModuleTrust.js');
 const { normalizeWebHostRequirements, validateWebHostRequirements } = require('./webHostRequirements.js');
 
 const ISOLATED_EXECUTION_TTL_MS = 15_000;
+const LOCAL_ADDON_PREFIX = 'overtone-local:';
+const isLocalAddonId = (id) => typeof id === 'string' && id.startsWith(LOCAL_ADDON_PREFIX);
 
 const createBlockedAddonError = (addonId, category, reason) => {
     const error = new Error(`[PulseSync Addons] Blocked isolated addon ${addonId || '<unknown>'}: ${category}: ${reason}`);
@@ -150,7 +152,7 @@ const resolveCanonicalAddon = (snapshot, requestedAddonId) => {
 
     const addon = matches[0];
     for (const capability of ['typed-settings-v1', 'net-per-addon-v1']) {
-        if (addon.requirements?.capabilities?.includes(capability) && !snapshot.clientCapabilities?.includes(capability))
+        if (!isLocalAddonId(addonId) && addon.requirements?.capabilities?.includes(capability) && !snapshot.clientCapabilities?.includes(capability))
             throw new Error(`webhost-incompatible: Update the PulseSync client for ${capability}`);
     }
     if (normalizeAssetType(addon.type) !== 'web-addon') {
@@ -338,6 +340,8 @@ class IsolatedAddonExecutionStore {
 module.exports = {
     ISOLATED_EXECUTION_TTL_MS,
     IsolatedAddonExecutionStore,
+    LOCAL_ADDON_PREFIX,
+    isLocalAddonId,
     normalizeCanonicalSnapshot,
     resolveCanonicalAddon,
     validateAddonId,

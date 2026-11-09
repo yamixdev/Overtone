@@ -70,7 +70,6 @@ const getSortedDescReleaseNotesKeys_js_1 = require('./lib/releaseNotes/getSorted
 const removeNewerReleaseNotes_js_1 = require('./lib/releaseNotes/removeNewerReleaseNotes.js');
 const formatters_js_1 = require('./lib/i18n/formatters.js');
 const stringToAST_js_1 = require('./lib/i18n/stringToAST.js');
-const { sendFeaturesMetric, sendDownloadTracksMetric, sendExperimentsMetric } = require('./lib/metrics.js');
 const gt_js_1 = __importDefault(require('semver/functions/gt.js'));
 const valid_js_1 = __importDefault(require('semver/functions/valid.js'));
 const i18nKeys_js_1 = require('./constants/i18nKeys.js');
@@ -175,80 +174,6 @@ const normalizeSubstitutedTrack = (track) => {
         track.ogImage ||
         track.cover?.uri ||
         track.coverUri;
-};
-
-const getLastFmScrobblingState = () => {
-    const lastFmEnabled = Boolean(store_js_1.getModSettings()?.scrobblers?.lastfm?.enable);
-    if (!lastFmEnabled) {
-        return 'disabled';
-    }
-
-    const lastFmScrobbler = getLastFmScrobbler();
-    return lastFmScrobbler?.isLoggedIn?.() ? 'enabled_logged_in' : 'enabled_logged_out';
-};
-
-const withDerivedFeatureMetrics = (modSettings) => ({
-    ...modSettings,
-    scrobblers: {
-        ...modSettings?.scrobblers,
-        lastfm: {
-            ...modSettings?.scrobblers?.lastfm,
-            scrobblingState: getLastFmScrobblingState(),
-        },
-    },
-});
-
-const buildLastFmScrobblingStatePatch = () => ({
-    modSettings: {
-        scrobblers: {
-            lastfm: {
-                scrobblingState: getLastFmScrobblingState(),
-            },
-        },
-    },
-});
-
-const buildFeaturesSnapshot = () => {
-    return {
-        sendModAnonymizedMetrics: store_js_1.get('sendModAnonymizedMetrics'),
-        enableYnisonPlayerRemoteControl: store_js_1.get('enableYnisonPlayerRemoteControl'),
-        ynisonInterceptPlayback: store_js_1.get('ynisonInterceptPlayback'),
-        autoUpdates: store_js_1.get('autoUpdates'),
-        modSettings: withDerivedFeatureMetrics(store_js_1.getModSettings()),
-    };
-};
-
-const buildFeaturesPatch = (path, value) => {
-    if (!path || typeof path !== 'string') {
-        return null;
-    }
-
-    if (path.startsWith('modSettings.globalShortcuts.') && path !== 'modSettings.globalShortcuts.enable' && path !== 'modSettings.globalShortcuts.enabled') {
-        return null;
-    }
-
-    const patch = {};
-    const keys = path.split('.');
-    const lastKey = keys.pop();
-    let current = patch;
-
-    for (const key of keys) {
-        current[key] = {};
-        current = current[key];
-    }
-
-    current[lastKey] = value;
-
-    if (path.startsWith('modSettings.scrobblers.lastfm.')) {
-        patch.modSettings = patch.modSettings || {};
-        patch.modSettings.scrobblers = patch.modSettings.scrobblers || {};
-        patch.modSettings.scrobblers.lastfm = {
-            ...(patch.modSettings.scrobblers.lastfm || {}),
-            scrobblingState: getLastFmScrobblingState(),
-        };
-    }
-
-    return patch;
 };
 
 const updateGlobalShortcuts = () => {
@@ -623,26 +548,6 @@ const handleApplicationEvents = (window) => {
                     };
                     eventsLogger.info('DOWNLOAD_TRACKS timing', timingMetric);
 
-                    const downloaderSettings = store_js_1.getModSettings()?.downloader ?? {};
-                    if (downloadResult?.queueMetrics || timingMetric.canceled || timingMetric.failed) {
-                        void sendDownloadTracksMetric({
-                            timing: {
-                                dirType,
-                                tracksCount: trackIds.length,
-                                elapsedMs: timingMetric.elapsedMs,
-                                elapsedSeconds: timingMetric.elapsedSeconds,
-                                queueWaitMs: timingMetric.queueWaitMs,
-                                canceled: timingMetric.canceled,
-                                failed: timingMetric.failed,
-                            },
-                            pipeline: downloadResult?.queueMetrics ?? null,
-                            settings: {
-                                concurrencyPreset: downloaderSettings.concurrencyPreset ?? 'adaptive',
-                                useMP3: downloaderSettings.useMP3 ?? false,
-                                addM3UToPlaylists: downloaderSettings.addM3UToPlaylists ?? false,
-                            },
-                        });
-                    }
                     activeTrackDownloadControllers.delete(toastNonce);
                     resetProgress(abortController.signal.aborted ? 'Отменено' : undefined);
                     setTimeout(() => {
@@ -735,12 +640,10 @@ const handleApplicationEvents = (window) => {
     });
     ipcRegistry.handle('scrobble-lastfm-login', async () => {
         await getLastFmScrobbler().login();
-        void sendFeaturesMetric(buildLastFmScrobblingStatePatch());
     });
 
     ipcRegistry.handle('scrobble-lastfm-logout', async () => {
         await getLastFmScrobbler().logout();
-        void sendFeaturesMetric(buildLastFmScrobblingStatePatch());
     });
 
     ipcRegistry.handle('scrobble-lastfm-get-user', () => {
@@ -978,7 +881,6 @@ const handleApplicationEvents = (window) => {
     });
     ipcRegistry.on(IpcChannel.APPLICATION_READY, async (event, language) => {
         eventsLogger.info('Event received', IpcChannel.APPLICATION_READY);
-        void sendFeaturesMetric(buildFeaturesSnapshot());
 
         isPlayerReady = false;
         validationNotificationsReady = false;
@@ -1219,29 +1121,27 @@ const handleApplicationEvents = (window) => {
         (0, discordRichPresence_js_1.fromYnisonState)(structuredClone(data));
     });
 
-    ipcRegistry.on(events_js_1.Events.DOWNLOAD_MOD_UPDATE, async (event, data) => {
+    ipcRegistry.on(events_js_1.Events.DOWNLOAD_MOD_UPDATE, async (event) => {
+        if (event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) return;
         eventsLogger.info(`Event received`, events_js_1.Events.DOWNLOAD_MOD_UPDATE);
 
         let callback = (progressRenderer, progressWindow) => {
+            if (window.isDestroyed()) return;
             sendProgressBarChange(window, 'modUpdateToast', progressRenderer * 100);
             window.setProgressBar(progressWindow);
         };
         await (0, modUpdater_js_1.getModUpdater)().onUpdateDownload(throttle(callback, PROGRESS_BAR_THROTTLE_MS));
     });
 
-    ipcRegistry.on(events_js_1.Events.INSTALL_MOD_UPDATE, async (event, data) => {
+    ipcRegistry.handle(events_js_1.Events.INSTALL_MOD_UPDATE, async (event) => {
+        if (event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) return false;
         eventsLogger.info(`Event received`, events_js_1.Events.INSTALL_MOD_UPDATE);
-        await (0, modUpdater_js_1.getModUpdater)().onInstallUpdate();
+        const installed = await (0, modUpdater_js_1.getModUpdater)().onInstallUpdate();
+        if (!installed) sendProgressBarChange(window, 'modUpdateToast', -100);
+        return installed;
     });
 
     const setNativeStoreValue = (key, value) => {
-        if (key === 'modSettings.window.hidePulseSyncVersionInTitleBar') {
-            const isPremium = Boolean(getPulseSyncManager()?.isPremiumUser);
-            if (value && !isPremium) {
-                eventsLogger.warn('Blocked non-premium attempt to hide PulseSync version in title bar');
-                value = false;
-            }
-        }
         store_js_1.set(key, value);
         if (key === 'modSettings.r128Normalization' && value !== true) ugcLoudness.cancelPending();
         if ('string' == typeof key && ('modSettings.globalShortcuts' === key || key.startsWith('modSettings.globalShortcuts.'))) {
@@ -1269,10 +1169,6 @@ const handleApplicationEvents = (window) => {
         if (key === WASAPI_EXCLUSIVE_FORCE_FULL_VOLUME_SETTING_KEY) {
             nativeAudioOutput.refreshWasapiExclusiveVolumePolicy();
         }
-        const featurePatch = buildFeaturesPatch(key, value);
-        if (featurePatch) {
-            void sendFeaturesMetric(featurePatch);
-        }
         return value;
     };
     ipcRegistry.handle(events_js_1.Events.NATIVE_STORE_GET, (event, key) => {
@@ -1286,10 +1182,6 @@ const handleApplicationEvents = (window) => {
     ipcRegistry.on(events_js_1.Events.NATIVE_STORE_SET, (event, key, value) => {
         eventsLogger.info(`Event received`, events_js_1.Events.NATIVE_STORE_SET, key, value);
         setNativeStoreValue(key, value);
-    });
-    ipcRegistry.on(events_js_1.Events.EXPERIMENTS_METRIC, (event, experiments) => {
-        eventsLogger.info(`Event received`, events_js_1.Events.EXPERIMENTS_METRIC);
-        void sendExperimentsMetric(experiments);
     });
     ipcRegistry.on(events_js_1.Events.NATIVE_AUDIO_OUTPUT_CONFIGURE_YASP_SOURCE, (event, payload) => {
         nativeAudioOutput.configureYaspSource(payload);
@@ -1416,8 +1308,8 @@ const sendUpdateAvailable = (window, version) => {
     eventsLogger.info('Event sent', IpcChannel.UPDATE_AVAILABLE, version);
 };
 exports.sendUpdateAvailable = sendUpdateAvailable;
-const sendModUpdateAvailable = (window, currVersion, newVersion) => {
-    sendToApplicationRenderer(window, events_js_1.Events.MOD_UPDATE_AVAILABLE, currVersion, newVersion, Date.now());
+const sendModUpdateAvailable = (window, currVersion, newVersion, portable) => {
+    sendToApplicationRenderer(window, events_js_1.Events.MOD_UPDATE_AVAILABLE, currVersion, newVersion, Date.now(), portable);
     eventsLogger.info('Event sent', events_js_1.Events.MOD_UPDATE_AVAILABLE, currVersion, newVersion);
 };
 exports.sendModUpdateAvailable = sendModUpdateAvailable;

@@ -4,6 +4,7 @@ exports.setupSystemMenu = void 0;
 const electron_1 = require('electron');
 const deviceInfo_js_1 = require('./deviceInfo.js');
 const updater_js_1 = require('./updater.js');
+const { getUpdateChannel } = require('./updateChannel.js');
 const config_js_1 = require('../config.js');
 const platform_js_1 = require('../types/platform.js');
 const formatters_js_1 = require('./i18n/formatters.js');
@@ -25,6 +26,7 @@ const createContextMenu = (window) => {
                 },
                 {
                     label: (0, formatters_js_1.formatMessage)({ id: 'desktop.check-for-updates' }),
+                    enabled: getUpdateChannel() === 'yandex',
                     click() {
                         updater.check();
                     },

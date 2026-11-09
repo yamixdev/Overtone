@@ -148,7 +148,6 @@ const init = () => {
             startupPage: '/',
             saveWindowDimensionsOnRestart: false,
             saveWindowPositionOnRestart: false,
-            hidePulseSyncVersionInTitleBar: false,
         },
         globalShortcuts: {
             enable: true,
@@ -196,9 +195,8 @@ const init = () => {
             showAudioQualityOnNewWave: true,
         },
         appAutoUpdates: {
-            enableAppAutoUpdate: store.get(store_js_1.StoreKeys.AUTO_UPDATES) ?? true,
+            channel: require('./updateChannel.js').getUpdateChannel(),
             enableAppAutoUpdateByProbability: false,
-            enableModAutoUpdate: true,
         },
         scrobblers: {
             lastfm: {
@@ -259,7 +257,6 @@ const init = () => {
         },
     });
     initField(store_js_1.StoreKeys.IS_DEVTOOLS_ENABLED, false);
-    initField(store_js_1.StoreKeys.SEND_ANONYMIZED_METRICS, true);
     initField(store_js_1.StoreKeys.ENABLE_YNISON_REMOTE_CONTROL, true);
     initField(store_js_1.StoreKeys.YNISON_INTERCEPT_PLAYBACK, false);
     initField(store_js_1.StoreKeys.DISPLAY_MAX_FPS, 60);

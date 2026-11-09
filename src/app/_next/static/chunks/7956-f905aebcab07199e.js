@@ -720,7 +720,7 @@
                             })();
                         }, []),
                         // for PulseSync: END native close callback binding for the mod titlebar
-                        // for PulseSync: BEGIN titlebar mini-player, mod settings, double-click and version visibility actions
+                        // for PulseSync: BEGIN titlebar mini-player, mod settings and double-click actions
                         onMiniPlayerToggle = (0, s.useCallback)(() => {
                             window.musicDesktop?.pulsesync.miniplayer.toggle();
                         }, []),
@@ -731,18 +731,8 @@
                             if (e.target.closest('button')) return;
                             var t;
                             null == (t = window.musicDesktop) || t.window.maximize();
-                        }, []),
-                        [w, N] = (0, s.useState)(window.HIDE_PULSESYNC_VERSION_IN_TITLEBAR?.() ?? !1);
-                    (0, s.useEffect)(() => {
-                        let e = (t, a) => {
-                                'modSettings.window.hidePulseSyncVersionInTitleBar' === t && N(a);
-                            },
-                            t = window.musicDesktop?.pulsesync.settings.onChange?.(e);
-                        return () => {
-                            'function' == typeof t && t();
-                        };
-                    }, []);
-                        // for PulseSync: END titlebar mini-player, mod settings, double-click and version visibility actions
+                        }, []);
+                    // for PulseSync: END titlebar mini-player, mod settings and double-click actions
                     return (0, a.jsx)('div', {
                         // for PulseSync: BEGIN macOS titlebar class and platform-specific double-click handling
                         className: (0, i.$)(c().root, { [c().root_macos]: isMacOS }),
@@ -755,7 +745,7 @@
                                 children: [
                                     // for PulseSync: BEGIN titlebar mod version, settings, mini-player and minimize controls
                                     // for PulseSync: BEGIN display fork name and version in the title bar
-                                    !w && (0, a.jsx)('span', { className: c().pulseText, children: `${window.MOD_NAME} ${window.PULSE_VERSION}` }),
+                                    (0, a.jsx)('span', { className: c().pulseText, children: `${window.MOD_NAME} ${window.PULSE_VERSION}` }),
                                     // for PulseSync: END display fork name and version in the title bar
                                     (0, a.jsx)(h, {
                                         onClick: onPulseSyncSettingsOpen,
@@ -987,11 +977,15 @@
                 pulseToastStyles = t.n(pulseToastStylesModule),
                 pulseToastIntl = t(2058);
             const PulseSyncModUpdateToast = (e) => {
-                let { version: t, formatMessage: a, closeToast: n, operation } = e,
+                // for PulseSync: BEGIN show the ZIP action for portable Overtone updates
+                let { version: t, formatMessage: a, closeToast: n, operation, portable } = e,
+                    // for PulseSync: END show the ZIP action for portable Overtone updates
                     [o, l] = (0, pulseToastReact.useState)(operation.progress),
-                    u = (0, pulseToastReact.useCallback)(() => {
-                        (window.musicDesktop?.pulsesync.updates.install?.(), null == n || n());
+                    // for PulseSync: BEGIN keep the update notice visible if setup cannot start
+                    u = (0, pulseToastReact.useCallback)(async () => {
+                        if (await window.musicDesktop?.pulsesync.updates.install?.()) n?.();
                     }, [n]),
+                    // for PulseSync: END keep the update notice visible if setup cannot start
                     d = (0, pulseToastReact.useCallback)(() => {
                         window.musicDesktop?.pulsesync.updates.download?.();
                     }, []),
@@ -1032,7 +1026,9 @@
                                     }),
                                     (0, pulseToastJsx.jsx)(pulseToastButton.$, {
                                         className: pulseToastStyles().button,
-                                        onClick: o <= 100 ? d : u,
+                                        // for PulseSync: BEGIN open the portable ZIP or run the installed updater
+                                        onClick: portable || o <= 100 ? d : u,
+                                        // for PulseSync: END open the portable ZIP or run the installed updater
                                         variant: 'default',
                                         color: 'secondary',
                                         size: 'xs',
@@ -1042,12 +1038,16 @@
                                             variant: 'div',
                                             type: 'controls',
                                             size: 'm',
-                                            children: c(o),
+                                                // for PulseSync: BEGIN label the portable update download
+                                                children: portable ? 'Скачать ZIP' : c(o),
+                                                // for PulseSync: END label the portable update download
                                         }),
                                     }),
                                 ],
                             }),
-                        [a, u, t, o, d],
+                        // for PulseSync: BEGIN refresh the toast when portable mode changes
+                        [a, u, t, o, d, portable],
+                        // for PulseSync: END refresh the toast when portable mode changes
                     ),
                     v = () => l(operation.progress);
                 return (
@@ -1212,15 +1212,17 @@
                         if (!operation || (createNonce && operation.nonce && createNonce !== operation.nonce)) return;
                         close(operation);
                     };
-                    const modUpdate = (currentVersion, newVersion, nonce = 0) => {
+                    // for PulseSync: BEGIN carry portable update mode into the notification
+                    const modUpdate = (currentVersion, newVersion, nonce = 0, portable = false) => {
                         const version = String(currentVersion) + ' -> ' + newVersion;
                         if (operations.get('modUpdateToast')?.version === version) return;
                         const operation = create('modUpdateToast', '', '', nonce ? version + ':' + nonce : 0, undefined, undefined, {
                             component: PulseSyncModUpdateToast,
-                            props: { version, formatMessage },
+                            props: { version, formatMessage, portable },
                         });
                         if (operation) operation.version = version;
                     };
+                    // for PulseSync: END carry portable update mode into the notification
                     const gpuStall = (reason = 'GPU_STALL', nonce = 0) => {
                         if (operations.has('GPU_STALL')) return;
                         create('GPU_STALL', 'Аппаратное ускорение отключилось: ' + reason, 'Исправить', nonce, 'APPLICATION_RESTART', undefined, {

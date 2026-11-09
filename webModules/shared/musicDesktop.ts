@@ -119,8 +119,8 @@ export type PulseSyncDesktopBridge = {
     };
     updates: {
         download: () => void;
-        install: () => void;
-        onAvailable: Subscription<[currentVersion: string, newVersion: string, nonce?: number]>;
+        install: () => Promise<boolean>;
+        onAvailable: Subscription<[currentVersion: string, newVersion: string, nonce?: number, portable?: boolean]>;
     };
     app: {
         restart: () => void;
@@ -134,7 +134,6 @@ export type PulseSyncDesktopBridge = {
         onCurrentTrackRequest: Subscription<[]>;
         reportYnisonState: (state: Snapshot) => void;
     };
-    metrics: { reportExperiments: (metrics: unknown) => void };
     lastfm: { onUserInfoChanged: Subscription<[user: unknown]> };
     miniplayer: { toggle: () => void };
 };

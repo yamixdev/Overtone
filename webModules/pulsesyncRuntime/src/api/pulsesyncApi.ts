@@ -68,7 +68,6 @@ function getCurrentEntity() {
 const LEGACY_MOD_SETTING_KEYS = new Set([
     'enableYnisonPlayerRemoteControl',
     'ynisonInterceptPlayback',
-    'sendModAnonymizedMetrics',
     'devMode',
 ]);
 

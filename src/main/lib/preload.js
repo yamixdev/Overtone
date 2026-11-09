@@ -49,30 +49,17 @@ const parseLyricsfile = (source) => {
 };
 const PULSESYNC_TITLEBAR_TEXT_CLASS = 'TitleBar_pulseText__FhYv';
 const PULSESYNC_TITLEBAR_GUARD_ATTRIBUTE = 'data-pulsesync-titlebar-branding-guard';
-let cachedTitlebarVisibilitySettings = null;
+let cachedIsPremiumUser;
 const getIsPremiumUserSync = () => {
+    if (cachedIsPremiumUser !== undefined) {
+        return cachedIsPremiumUser;
+    }
     try {
-        return Boolean(electron_1.ipcRenderer.sendSync('isPremiumUserSync'));
-    } catch (error) {
+        cachedIsPremiumUser = Boolean(electron_1.ipcRenderer.sendSync('isPremiumUserSync'));
+        return cachedIsPremiumUser;
+    } catch {
         return false;
     }
-};
-const getTitlebarVisibilitySettings = () => {
-    if (cachedTitlebarVisibilitySettings) {
-        return cachedTitlebarVisibilitySettings;
-    }
-
-    const hidePulseSyncVersion = Boolean(store_js_1.get('modSettings.window.hidePulseSyncVersionInTitleBar'));
-    const isPremium = getIsPremiumUserSync();
-    cachedTitlebarVisibilitySettings = {
-        hidePulseSyncVersion,
-        isPremium,
-        shouldHidePulseSyncVersion: hidePulseSyncVersion && isPremium,
-    };
-    return cachedTitlebarVisibilitySettings;
-};
-const resetTitlebarVisibilitySettings = () => {
-    cachedTitlebarVisibilitySettings = null;
 };
 const registerApplicationInitFinishedEvent = () => {
     if (window.__pulsesyncApplicationInitFinishedRegistered) {
@@ -212,7 +199,6 @@ const registerApplicationInitFinishedEvent = () => {
     cleanupTimer = setTimeout(cleanupApplicationInitFinishedWatchers, observerCleanupMs);
     requestAnimationFrame(checkApplicationInitFinished);
 };
-const nativeStoreUpdateListeners = new Set();
 const registerNativeStoreUpdateCacheSync = () => {
     if (window.__pulsesyncNativeStoreUpdateCacheSyncRegistered) {
         return;
@@ -221,20 +207,9 @@ const registerNativeStoreUpdateCacheSync = () => {
 
     electron_1.ipcRenderer.on(events_js_1.Events.NATIVE_STORE_UPDATE, (event, key, value) => {
         store_js_1.updateCache?.(key, value);
-        if (typeof key === 'string' && key.startsWith('modSettings')) {
-            resetTitlebarVisibilitySettings();
-        }
-        nativeStoreUpdateListeners.forEach((callback) => callback(key, value));
     });
 };
 registerApplicationInitFinishedEvent();
-const shouldHidePulseSyncVersionInTitleBar = () => {
-    try {
-        return getTitlebarVisibilitySettings().shouldHidePulseSyncVersion;
-    } catch (error) {
-        return false;
-    }
-};
 const cleanupNonPremiumTitlebarBranding = () => {
     window.document.documentElement.removeAttribute(PULSESYNC_TITLEBAR_GUARD_ATTRIBUTE);
     for (const element of window.document.querySelectorAll('[data-pulsesync-titlebar-branding="true"]')) {
@@ -260,8 +235,7 @@ const cleanupNonPremiumTitlebarBranding = () => {
     }
 };
 const ensureNonPremiumTitlebarBranding = () => {
-    const titlebarVisibilitySettings = getTitlebarVisibilitySettings();
-    if (titlebarVisibilitySettings.shouldHidePulseSyncVersion || titlebarVisibilitySettings.isPremium) {
+    if (getIsPremiumUserSync()) {
         cleanupNonPremiumTitlebarBranding();
         return;
     }
@@ -381,13 +355,8 @@ const installNonPremiumTitlebarBrandingGuard = () => {
     ensureNonPremiumTitlebarBranding();
     observeTitlebar();
 
-    nativeStoreUpdateListeners.add((key) => {
-        if (typeof key === 'string' && key.startsWith('modSettings')) {
-            scheduleGuard();
-        }
-    });
-    electron_1.ipcRenderer.on(events_js_1.Events.PULSESYNC_PREMIUM_STATUS_CHANGED, () => {
-        resetTitlebarVisibilitySettings();
+    electron_1.ipcRenderer.on(events_js_1.Events.PULSESYNC_PREMIUM_STATUS_CHANGED, (event, isPremium) => {
+        cachedIsPremiumUser = Boolean(isPremium);
         scheduleGuard();
     });
 
@@ -423,7 +392,6 @@ const loadWorker = (workerName) => {
 registerNativeStoreUpdateCacheSync();
 
 electron_1.contextBridge.exposeInMainWorld('IS_PREMIUM_USER', () => electron_1.ipcRenderer.invoke('isPremiumUser'));
-electron_1.contextBridge.exposeInMainWorld('HIDE_PULSESYNC_VERSION_IN_TITLEBAR', () => shouldHidePulseSyncVersionInTitleBar());
 electron_1.contextBridge.exposeInMainWorld('IS_DEVTOOLS_ENABLED', Boolean(store_js_1.getDevMode() || pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled));
 if (pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled) {
     electron_1.contextBridge.exposeInMainWorld('__PULSESYNC_DEV__', {

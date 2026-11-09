@@ -66,7 +66,7 @@ function App({ api }: AppProps = {}) {
     const [activeSection, setActiveSection] = useState<SettingsSectionId>('playlists');
     const [highlightedSettingId, setHighlightedSettingId] = useState<string>();
     const [searchQuery, setSearchQuery] = useState('');
-    const [restartNoticeRevision, setRestartNoticeRevision] = useState(0);
+    const [showRestartNotice, setShowRestartNotice] = useState(false);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const modSettingsApi = getModSettingsApi(api);
@@ -78,22 +78,12 @@ function App({ api }: AppProps = {}) {
         false,
     );
     const notifyRestartRequired = useCallback(() => {
-        setRestartNoticeRevision((revision) => revision + 1);
+        setShowRestartNotice(true);
     }, []);
     const isInMyVibeCategory = MY_VIBE_SECTION_IDS.has(activeSection);
     const shouldRevealMyVibe = isInMyVibeCategory && activeSection !== 'vibe-behavior';
     const shouldOffsetModal = shouldRevealMyVibe && window.location.href === MAIN_PAGE_URL;
     const isSearching = Boolean(searchQuery.trim());
-
-    useEffect(() => {
-        if (!restartNoticeRevision) {
-            return;
-        }
-
-        const timeout = window.setTimeout(() => setRestartNoticeRevision(0), 4000);
-
-        return () => window.clearTimeout(timeout);
-    }, [restartNoticeRevision]);
 
     useEffect(() => {
         let active = true;
@@ -322,10 +312,38 @@ function App({ api }: AppProps = {}) {
                         ))}
                     </div>
                 </div>
+                <div className={styles.restartNotice} data-visible={showRestartNotice}>
+                    <span role="status">
+                        {showRestartNotice && 'Для применения изменений требуется перезапуск приложения'}
+                    </span>
+                    {showRestartNotice && (
+                        <div className={styles.restartActions}>
+                            <button
+                                className={styles.restartButton}
+                                type="button"
+                                disabled={!window.musicDesktop?.pulsesync.app.restart}
+                                onClick={() => window.musicDesktop?.pulsesync.app.restart()}
+                            >
+                                Перезагрузить
+                            </button>
+                            <button
+                                className={styles.closeButton}
+                                type="button"
+                                aria-label="Закрыть уведомление о перезапуске"
+                                onClick={(event) => {
+                                    setShowRestartNotice(false);
+
+                                    if (document.activeElement === event.currentTarget) {
+                                        searchInputRef.current?.focus();
+                                    }
+                                }}
+                            >
+                                ×
+                            </button>
+                        </div>
+                    )}
+                </div>
             </section>
-            <div className={styles.restartNotice} role="status">
-                {restartNoticeRevision > 0 && <span>Для применения этой настройки требуется перезапуск приложения</span>}
-            </div>
         </div>
     );
 }

@@ -6,6 +6,7 @@ const node_path_1 = require('node:path');
 const deviceInfo_js_1 = require('./deviceInfo.js');
 const updater_js_1 = require('./updater.js');
 const modUpdater_js_1 = require('./modUpdater.js');
+const { getUpdateChannel } = require('./updateChannel.js');
 const formatters_js_1 = require('./i18n/formatters.js');
 const state_js_1 = require('./state.js');
 const toggleWindowState_js_1 = require('./window/toggleWindowState.js');
@@ -61,22 +62,10 @@ const createContextMenu = (window) => {
         },
         {
             label: (0, formatters_js_1.formatMessage)({ id: 'desktop.check-for-updates' }),
+            enabled: getUpdateChannel() !== 'off',
             click() {
-                updater.check();
-            },
-        },
-        {
-            label: 'Проверить обновления мода',
-            visible: config_js_1.config.modification.upstreamUpdatesEnabled !== false,
-            click() {
-                modUpdater.check();
-            },
-        },
-        {
-            label: 'Переустановить мод',
-            visible: config_js_1.config.modification.upstreamUpdatesEnabled !== false,
-            click() {
-                modUpdater.check(true);
+                if (getUpdateChannel() === 'overtone') void modUpdater.check();
+                else void updater.check();
             },
         },
         {

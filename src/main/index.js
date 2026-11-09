@@ -8,7 +8,6 @@ global.requireIfExists = (path) => {
     }
 };
 const electron_1 = require('electron');
-const config_js_1 = require('./config.js');
 const platform_js_1 = require('./types/platform.js');
 const Logger_js_1 = require('./packages/logger/Logger.js');
 const systemMenu_js_1 = require('./lib/systemMenu.js');
@@ -20,10 +19,10 @@ const createWindow_js_1 = require('./lib/window/createWindow.js');
 const { registerWindowsAppShortcut, windowsAppId } = require('./lib/window/registerWindowsAppShortcut.js');
 const updater_js_1 = require('./lib/updater.js');
 const modUpdater_js_1 = require('./lib/modUpdater.js');
+const { getUpdateChannel } = require('./lib/updateChannel.js');
 const miniPlayer_js_1 = require('./lib/miniplayer/miniplayer.js');
 const { getFfmpegUpdater } = require('./lib/ffmpegInstaller.js');
 const { getYtDlpInstaller } = require('./lib/ytDlpInstaller.js');
-const { initUserCountMetric } = require('./lib/metrics');
 const { throttle } = require('./lib/utils.js');
 const pulsesyncDevConfig_js_1 = require('./lib/pulsesyncDevConfig.js');
 const pulsesyncDevReload_js_1 = require('./lib/pulsesyncDevReload.js');
@@ -48,15 +47,6 @@ Logger_js_1.Logger.setupLogger();
 const logger = new Logger_js_1.Logger('Main');
 
 logger.log('Application starting...');
-
-if (!pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled && (store_js_1.get('sendModAnonymizedMetrics') ?? true)) {
-    initUserCountMetric({
-        endpointUrl: 'https://ru-node-1.pulsesync.dev/api/v2/metrics',
-        apiKey: 'l4lRNGW8mFQDmBBIEd0ZJSeI9ARRcgSaf_p5kkpmCvw',
-        appName: 'YandexMusic',
-        modVersion: config_js_1.config.modification.version,
-    });
-}
 
 (0, store_js_1.init)();
 (0, handleUncaughtException_js_1.handleUncaughtException)();
@@ -131,28 +121,23 @@ const MiniPlayer = miniPlayer_js_1.getMiniPlayer();
     if ([platform_js_1.Platform.WINDOWS, platform_js_1.Platform.LINUX].includes(deviceInfo_js_1.devicePlatform)) {
         (0, customTitleBar_js_1.createCustomTitleBar)(window);
     }
-    if (
-        !pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled &&
-        (store_js_1.getModSettings()?.appAutoUpdates.enableAppAutoUpdate ?? config_js_1.config.app.enableAutoUpdate)
-    ) {
-        updater.start();
+    if (!pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled && getUpdateChannel() === 'yandex') {
         updater.onUpdate((version) => {
             (0, events_js_1.sendUpdateAvailable)(window, version);
         });
+        updater.start();
     }
-    modUpdater.onUpdateAvailable((currVersion, newVersion) => {
-        (0, events_js_1.sendModUpdateAvailable)(window, currVersion, newVersion);
+    modUpdater.onUpdateAvailable((currVersion, newVersion, portable) => {
+        (0, events_js_1.sendModUpdateAvailable)(window, currVersion, newVersion, portable);
+        if (portable) return;
         let callback = (progressRenderer, progressWindow) => {
+            if (window.isDestroyed()) return;
             events_js_1.sendProgressBarChange(window, 'modUpdateToast', progressRenderer * 100);
             window.setProgressBar(progressWindow);
         };
         (0, modUpdater_js_1.getModUpdater)().onUpdateDownload(throttle(callback, 200));
     });
-    if (
-        !pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled &&
-        store_js_1.getModSettings()?.appAutoUpdates.enableModAutoUpdate &&
-        deviceInfo_js_1.devicePlatform === platform_js_1.Platform.WINDOWS
-    ) {
+    if (!pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled) {
         modUpdater.start();
     }
 })();

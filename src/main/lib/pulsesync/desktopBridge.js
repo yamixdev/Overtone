@@ -58,7 +58,7 @@ const createPulseSyncDesktopBridge = (subscribe) => ({
     },
     updates: {
         download: () => ipcRenderer.send(Events.DOWNLOAD_MOD_UPDATE),
-        install: () => ipcRenderer.send(Events.INSTALL_MOD_UPDATE),
+        install: () => ipcRenderer.invoke(Events.INSTALL_MOD_UPDATE),
         onAvailable: (listener) => subscribe(Events.MOD_UPDATE_AVAILABLE, listener),
     },
     app: {
@@ -72,9 +72,6 @@ const createPulseSyncDesktopBridge = (subscribe) => ({
         onApiRequest: (listener) => subscribe(Events.PULSESYNC_API, listener),
         onCurrentTrackRequest: (listener) => subscribe(Events.GET_CURRENT_TRACK, listener),
         reportYnisonState: (state) => ipcRenderer.send(Events.YNISON_STATE, state),
-    },
-    metrics: {
-        reportExperiments: (metrics) => ipcRenderer.send(Events.EXPERIMENTS_METRIC, metrics),
     },
     lastfm: {
         onUserInfoChanged: (listener) => subscribe(Events.LASTFM_USERINFO_UPDATE, listener),

@@ -41,6 +41,14 @@
 
 .backdrop {
     --modal-viewport-inset: 24px;
+    --settings-overlay: rgba(0, 0, 0, 0.32);
+    --settings-surface: var(--ym-background-color-primary-enabled-popover, #242424);
+    --settings-glass: rgba(26, 26, 26, 0.88);
+    --settings-glass-highlight: rgba(255, 255, 255, 0.03);
+    --settings-glass-rim: rgba(255, 255, 255, 0.16);
+    --ym-controls-color-primary-text-enabled_variant: #e6e6e6;
+    --ym-controls-color-primary-text-enabled: #d2d2d2;
+    --ym-controls-color-secondary-text-enabled: var(--ym-controls-color-primary-text-enabled);
 
     position: fixed;
     z-index: var(--ym-z-index-modal, 500);
@@ -48,7 +56,7 @@
     display: grid;
     place-items: center;
     padding: 24px;
-    background: rgba(0, 0, 0, 0.52);
+    background: var(--settings-overlay);
     box-sizing: border-box;
     opacity: 0;
     pointer-events: none;
@@ -63,28 +71,64 @@
 }
 
 .dimmed {
-    background: rgba(0, 0, 0, 0.2);
+    background: rgba(0, 0, 0, 0.14);
 }
 
 .restartNotice {
-    position: absolute;
-    inset-inline: var(--modal-viewport-inset);
-    inset-block-end: var(--modal-viewport-inset);
-    display: flex;
-    justify-content: center;
-    pointer-events: none;
-
-    > span {
-        min-inline-size: 0;
-        padding: 10px 16px;
-        border: 1px solid var(--ym-controls-color-secondary-outline-default-stroke, rgba(255, 255, 255, 0.08));
-        border-radius: var(--ym-radius-size-l, 12px);
-        background: var(--ym-background-color-primary-enabled-popover, #242424);
-        color: var(--ym-controls-color-primary-text-enabled, #fff);
+    &[data-visible='true'] {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: center;
+        align-self: center;
+        gap: 4px 12px;
+        max-inline-size: calc(100% - 24px);
+        margin-block-end: 12px;
+        padding: 4px 8px 4px 12px;
+        border-radius: 16px;
+        box-sizing: border-box;
+        background: var(--settings-surface);
+        box-shadow:
+            inset 0 0 0 1px var(--settings-glass-rim),
+            0 4px 16px rgba(0, 0, 0, 0.16);
         font-size: var(--ym-font-size-label-m, 14px);
         line-height: var(--ym-font-line-height-label-m, 20px);
         text-align: center;
         overflow-wrap: anywhere;
+    }
+}
+
+.restartActions {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    min-inline-size: 0;
+}
+
+.restartButton {
+    min-block-size: 40px;
+    padding-inline: 12px;
+    color: var(--ym-controls-color-primary-on_default-enabled, #1a1a1a);
+    background: var(--ym-controls-color-primary-default-enabled, #ffdb4d);
+    border: 1px solid transparent;
+    border-radius: 12px;
+    font: inherit;
+    font-weight: 600;
+    cursor: pointer;
+
+    &:hover:not(:disabled) {
+        background: var(--ym-controls-color-primary-default-hovered, #ffdf67);
+    }
+
+    &:focus-visible {
+        outline: 2px solid var(--ym-controls-color-primary-text-enabled_variant);
+        outline-offset: 2px;
+    }
+
+    &:disabled {
+        opacity: 0.55;
+        cursor: default;
     }
 }
 
@@ -97,10 +141,12 @@
     height: min(760px, calc(100vh - 48px));
     max-height: min(760px, calc(100vh - 48px));
     overflow: hidden;
-    color: var(--ym-controls-color-primary-text-enabled, #fff);
-    background: var(--ym-background-color-primary-enabled-popover, #242424);
+    color: var(--ym-controls-color-primary-text-enabled_variant);
+    background: var(--settings-surface);
     border-radius: 24px;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.38);
+    box-shadow:
+        inset 0 0 0 1px var(--settings-glass-rim),
+        0 20px 60px rgba(0, 0, 0, 0.32);
     opacity: 0;
     transform: translate3d(var(--modal-offset-x), 10px, 0) scale(0.97);
     transition:
@@ -110,6 +156,11 @@
     .backdrop[data-visible='true'] & {
         opacity: 1;
         transform: translate3d(var(--modal-offset-x), 0, 0) scale(1);
+    }
+
+    @supports (backdrop-filter: blur(1px)) {
+        background: linear-gradient(165deg, var(--settings-glass-highlight), transparent 180px), var(--settings-glass);
+        backdrop-filter: blur(16px) saturate(120%);
     }
 }
 
@@ -229,7 +280,7 @@
     h2 {
         flex: 0 0 auto;
         margin: 0;
-        color: white;
+        color: inherit;
         font: inherit;
         font-size: 24px;
         font-weight: 700;
@@ -285,7 +336,7 @@
 
         &::placeholder {
             color: var(--ym-controls-color-secondary-text-enabled, #a0a0a0);
-            opacity: 0.8;
+            opacity: 1;
         }
 
         &::-webkit-search-cancel-button,
@@ -297,8 +348,8 @@
 
     &:focus-within {
         background: var(--ym-background-color-secondary-hovered, rgba(255, 255, 255, 0.09));
-        border-color: var(--ym-controls-color-primary-default-enabled, #ffdb4d);
-        box-shadow: 0 0 0 2px rgba(255, 219, 77, 0.12);
+        outline: 2px solid var(--ym-controls-color-primary-text-enabled_variant);
+        outline-offset: 2px;
     }
 }
 
@@ -331,6 +382,7 @@
 }
 
 .closeButton {
+    flex: 0 0 auto;
     width: 40px;
     height: 40px;
     padding: 0;
@@ -451,13 +503,29 @@
     }
 }
 
-@include theme.light {
+@media (prefers-contrast: more), (forced-colors: active) {
     .modal {
-        color: var(--ym-controls-color-primary-text-enabled_variant, #fff);
+        background: var(--settings-surface);
+        backdrop-filter: none;
     }
+}
 
-    .header h2 {
-        color: inherit;
+@media (forced-colors: active) {
+    .modal,
+    .restartNotice[data-visible='true'] {
+        outline: 1px solid CanvasText;
+    }
+}
+
+@include theme.light {
+    .backdrop {
+        --settings-overlay: rgba(0, 0, 0, 0.22);
+        --settings-surface: var(--ym-background-color-primary-enabled-popover, #f5f5f5);
+        --settings-glass: rgba(245, 245, 245, 0.88);
+        --settings-glass-highlight: rgba(255, 255, 255, 0.38);
+        --settings-glass-rim: rgba(255, 255, 255, 0.72);
+        --ym-controls-color-primary-text-enabled_variant: #1a1a1a;
+        --ym-controls-color-primary-text-enabled: #424242;
     }
 
     .body,
@@ -483,7 +551,6 @@
 
         &:focus-within {
             background: var(--ym-controls-color-secondary-default-hovered, rgba(0, 0, 0, 0.1));
-            border-color: var(--ym-controls-color-primary-default-enabled, #ffdb4d);
         }
     }
 

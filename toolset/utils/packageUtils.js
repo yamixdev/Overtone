@@ -7,11 +7,10 @@ function createPackageUtils(runtime) {
         return packageJson.version;
     }
 
-    async function syncModVersion(src = SRC_PATH) {
+    async function syncModVersion(src = SRC_PATH, newVersion = getModVersion()) {
         const packageJsonPath = path.join(src, '/package.json');
         const packageJson = JSON.parse(await fsp.readFile(packageJsonPath, 'utf8'));
         const oldVersion = packageJson.modification?.version;
-        const newVersion = getModVersion();
 
         if (!packageJson.modification) {
             return { changed: false, skipped: true, oldVersion, newVersion };

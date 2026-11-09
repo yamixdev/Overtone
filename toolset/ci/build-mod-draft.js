@@ -87,12 +87,14 @@ async function smokeTest(executable, userData, appConfig) {
     }
 }
 
-async function hashZip(zipPath) {
+async function writeChecksum(filePath) {
     const hash = createHash('sha256');
-    for await (const chunk of fs.createReadStream(zipPath)) {
+    for await (const chunk of fs.createReadStream(filePath)) {
         hash.update(chunk);
     }
-    return hash.digest('hex');
+    const checksum = `${filePath}.sha256`;
+    await fsp.writeFile(checksum, `${hash.digest('hex')}  ${path.basename(filePath)}\n`, 'utf8');
+    return checksum;
 }
 
 async function main() {
@@ -106,14 +108,16 @@ async function main() {
     const { asar, semver, sevenZip } = core.runtime.deps;
     const src = JSON.parse(await fsp.readFile(path.join(SRC_PATH, 'package.json'), 'utf8'));
     const modName = src.modification?.name;
-    const modVersion = core.packageUtils.getModVersion();
+    const modVersion = process.env.OVERTONE_BUILD_VERSION || core.packageUtils.getModVersion();
+    if (!/^[0-9]+\.[0-9]+\.[0-9]+$/.test(modVersion) || semver.valid(modVersion) !== modVersion) {
+        throw new Error('Укажите стабильную версию Overtone в формате X.Y.Z.');
+    }
     const upstream = await core.extractUtils.fetchLatestYmYaml();
     const download = core.extractUtils.resolveYmDownloadInfo(upstream, null);
     if (
         !semver.valid(download?.version) ||
         semver.prerelease(download.version) ||
         !download.sha512 ||
-        !semver.valid(modVersion) ||
         !/^[A-Za-z0-9-]+$/.test(modName ?? '')
     ) {
         throw new Error('Не удалось определить стабильную версию Яндекс Музыки с SHA-512 или данные о модификации.');
@@ -128,14 +132,14 @@ async function main() {
     const commit = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO_ROOT, encoding: 'utf8' }).trim();
     const baseName = `Yandex-Music-${yandexMusicVersion}-${modName}-${modVersion}-win-x64-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`;
     const workspace = await fsp.mkdtemp(path.join(RUNNER_TEMP, 'pulsesync-draft-'));
-    const installer = path.join(workspace, 'upstream.exe');
+    const upstreamInstaller = path.join(workspace, 'upstream.exe');
     const stage = path.join(workspace, baseName);
     const modArchive = path.join(workspace, 'app.asar');
-    await core.extractUtils.downloadFile(download.downloadUrl, installer, download.size);
-    if ((await core.extractUtils.calcSha512Base64(installer)) !== download.sha512) {
+    await core.extractUtils.downloadFile(download.downloadUrl, upstreamInstaller, download.size);
+    if ((await core.extractUtils.calcSha512Base64(upstreamInstaller)) !== download.sha512) {
         throw new Error('SHA-512 скачанного установщика Яндекс Музыки не совпадает с манифестом.');
     }
-    await sevenZip.unpack(installer, stage);
+    await sevenZip.unpack(upstreamInstaller, stage);
 
     const executable = path.join(stage, appExecutableName);
     const appArchive = path.join(stage, 'resources', 'app.asar');
@@ -143,7 +147,7 @@ async function main() {
         throw new Error('Скачанный установщик не содержит приложение требуемой версии.');
     }
 
-    await core.buildUtils.build({ destDir: modArchive });
+    await core.buildUtils.build({ destDir: modArchive, modVersion });
     const built = readManifest(asar, modArchive);
     if (built.version !== yandexMusicVersion || built.modification?.realYMVersion !== yandexMusicVersion || built.modification?.version !== modVersion) {
         throw new Error('Версии в собранном app.asar не совпадают с версиями черновика.');
@@ -164,8 +168,24 @@ async function main() {
     const zip = path.join(workspace, `${baseName}.zip`);
     await sevenZip.pack(stage, zip);
     await sevenZip.cmd(['t', zip]);
-    const checksum = `${zip}.sha256`;
-    await fsp.writeFile(checksum, `${await hashZip(zip)}  ${path.basename(zip)}\n`, 'utf8');
+    const checksum = await writeChecksum(zip);
+
+    const installerName = `Overtone-Setup-${modVersion}-win-x64`;
+    const installer = path.join(workspace, `${installerName}.exe`);
+    const innoSetupCompiler = path.join(process.env['ProgramFiles(x86)'], 'Inno Setup 6', 'ISCC.exe');
+    execFileSync(
+        innoSetupCompiler,
+        [
+            `/DStageDir=${stage}`,
+            `/DModVersion=${modVersion}`,
+            `/DAppExe=${appExecutableName}`,
+            `/O${workspace}`,
+            `/F${installerName}`,
+            path.join(__dirname, 'overtone.iss'),
+        ],
+        { stdio: 'inherit', windowsHide: true },
+    );
+    const installerChecksum = await writeChecksum(installer);
 
     const notes = path.join(workspace, 'release-notes.md');
     await fsp.writeFile(
@@ -175,7 +195,9 @@ async function main() {
             '',
             `Коммит мода: \`${commit}\``,
             '',
-            `Распакуйте ZIP целиком и запустите \`${appExecutableName}\` из распакованной папки.`,
+            `Для установки запустите \`${path.basename(installer)}\`. Overtone устанавливается в \`%LOCALAPPDATA%\\Programs\\Overtone\` для текущего пользователя.`,
+            '',
+            `Для портативного запуска распакуйте ZIP целиком и откройте \`${appExecutableName}\` из распакованной папки.`,
             '',
         ].join('\n'),
         'utf8',
@@ -186,6 +208,8 @@ async function main() {
         commit,
         zip,
         checksum,
+        installer,
+        installerChecksum,
         notes,
     };
     await fsp.appendFile(

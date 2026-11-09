@@ -1,4 +1,5 @@
 'use strict';
+const { getUpdateChannel } = require('./updateChannel.js');
 Object.defineProperty(exports, '__esModule', { value: true });
 exports.getUpdater = exports.Updater = void 0;
 const semver = require('semver');
@@ -43,6 +44,7 @@ class Updater {
     constructor() {
         this.logger = new Logger_js_1.Logger('UpdateLogger');
         electron_updater_1.autoUpdater.autoDownload = false;
+        electron_updater_1.autoUpdater.autoInstallOnAppQuit = false;
         electron_updater_1.autoUpdater.logger = this.logger.withPrefix('Logger inside "electron-updater" package');
         electron_updater_1.autoUpdater.autoRunAppAfterInstall = true;
         electron_updater_1.autoUpdater.disableDifferentialDownload = false;
@@ -50,6 +52,7 @@ class Updater {
             this.logger.error('Updater error', error);
         });
         electron_updater_1.autoUpdater.on('update-downloaded', (updateInfo) => {
+            if (getUpdateChannel() !== 'yandex') return;
             if (this.downloadingVersion && this.downloadingVersion !== updateInfo.version) return;
             this.logger.log('Update downloaded', updateInfo.version);
             this.downloadedVersion = updateInfo.version;
@@ -154,12 +157,14 @@ class Updater {
             });
     }
     async check() {
+        if (getUpdateChannel() !== 'yandex') return;
         if (this.updateStatus === updateStatus_js_1.UpdateStatus.INSTALLING) {
             this.logger.log('Update is installing', this.updateStatus);
             return;
         }
         try {
             const updateResult = await electron_updater_1.autoUpdater.checkForUpdates();
+            if (getUpdateChannel() !== 'yandex') return;
             if (!updateResult) {
                 this.logger.log('Updater is inactive');
                 return;
@@ -186,6 +191,7 @@ class Updater {
         this.onUpdateListeners.push(listener);
     }
     install() {
+        if (getUpdateChannel() !== 'yandex') return;
         this.logger.info('Installing a new version', this.latestAvailableVersion);
         this.updateStatus = updateStatus_js_1.UpdateStatus.INSTALLING;
         state_js_1.state.willQuit = true;

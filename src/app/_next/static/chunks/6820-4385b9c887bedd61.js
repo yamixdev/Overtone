@@ -2960,11 +2960,6 @@
                     if (this.cacheController.shouldGetCache) return this.cacheController.get(r, 6048e5);
                     try {
                         let a = await super.experimentsDetails(t, e);
-                        // for PulseSync: BEGIN forward experiment metrics to the desktop bridge
-                        try {
-                            window.musicDesktop?.pulsesync.metrics.reportExperiments?.(a);
-                        } catch (t) {}
-                        // for PulseSync: END forward experiment metrics to the desktop bridge
                         return (this.cacheController.put({ requestId: r, response: a, priority: n.MEDIUM }), a);
                     } catch (t) {
                         return this.cacheController.handleError(t, r, 6048e5);

@@ -642,7 +642,7 @@ function createBuildUtils(runtime, { packageUtils, extractUtils, integrityUtils,
     }
 
     async function build(
-        { srcPath = SRC_PATH, destDir = DEFAULT_DIST_PATH, noMinify = false, noNativeModules = false, beforeReplace } = {
+        { srcPath = SRC_PATH, destDir = DEFAULT_DIST_PATH, noMinify = false, noNativeModules = false, beforeReplace, modVersion } = {
             srcPath: SRC_PATH,
             destDir: DEFAULT_DIST_PATH,
             noMinify: false,
@@ -656,7 +656,7 @@ function createBuildUtils(runtime, { packageUtils, extractUtils, integrityUtils,
         }
 
         const cleanupPaths = [];
-        const versionSync = await packageUtils.syncModVersion(workPath);
+        const versionSync = await packageUtils.syncModVersion(workPath, modVersion);
 
         if (versionSync.changed) {
             console.log(`Версия мода синхронизирована: ${versionSync.oldVersion ?? 'не задана'} -> ${versionSync.newVersion}`);

@@ -122,15 +122,34 @@ export const appSectionsSchema = defineSettingsSection({
     ],
 });
 
+const UPDATE_CHANNEL_KEY = 'modSettings.appAutoUpdates.channel';
+
 export const appUpdatesSchema = defineSettingsSection({
     title: 'Обновления',
     items: [
         {
-            type: 'toggle',
-            key: 'modSettings.appAutoUpdates.enableAppAutoUpdate',
-            defaultValue: true,
-            title: 'Автообновлять приложение',
-            description: 'Обновлять ли приложение автоматически',
+            type: 'select',
+            key: UPDATE_CHANNEL_KEY,
+            defaultValue: 'off',
+            title: 'Канал обновлений',
+            options: (context) => [
+                ...(context.platform === 'win32'
+                    ? [
+                          {
+                              value: 'overtone',
+                              label: 'Overtone',
+                              description: 'Новые сборки с модом. Для portable доступно скачивание ZIP.',
+                          },
+                      ]
+                    : []),
+                {
+                    value: 'yandex',
+                    label: 'Яндекс Музыка',
+                    description:
+                        'Официальное обновление может заменить модифицированную сборку и удалить Overtone из приложения.',
+                },
+                { value: 'off', label: 'Выключено', description: 'Проверка обновлений отключена.' },
+            ],
             restartRequired: true,
         },
         {
@@ -140,6 +159,7 @@ export const appUpdatesSchema = defineSettingsSection({
             invert: true,
             title: 'Получать обновления приложения сразу же',
             description: 'Выключает участие в получении обновлений волнами',
+            hiddenWhen: (context) => context.getString(UPDATE_CHANNEL_KEY) !== 'yandex',
             restartRequired: true,
         },
     ],

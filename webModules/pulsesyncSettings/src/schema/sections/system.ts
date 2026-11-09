@@ -71,14 +71,6 @@ export const systemSchema = defineSettingsSection({
             title: 'Автоматический запуск свернутым',
             description: 'Если включено, приложение будет запускаться свернутым в трей.',
         },
-        {
-            type: 'toggle',
-            key: 'sendModAnonymizedMetrics',
-            defaultValue: true,
-            title: 'Отправлять анонимную статистику',
-            description: 'Отключит отправку статистики Мода его разработчику. Не влияет на метрику Яндекса',
-            restartRequired: true,
-        },
     ],
 });
 

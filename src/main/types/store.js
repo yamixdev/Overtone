@@ -17,7 +17,6 @@ var StoreKeys;
     StoreKeys['WINDOW_MONITOR_ID'] = 'windowMonitorId';
     StoreKeys['DEFAULT_MUSIC_EXPERIMENT_OVERRIDES'] = 'defaultMusicExperimentOverrides';
     StoreKeys['REPOSITORY_META_UPDATED_AT'] = 'repositoryMetaUpdatedAt';
-    StoreKeys['SEND_ANONYMIZED_METRICS'] = 'sendModAnonymizedMetrics';
     StoreKeys['IS_DEVTOOLS_ENABLED'] = 'devMode';
     StoreKeys['ENABLE_YNISON_REMOTE_CONTROL'] = 'enableYnisonPlayerRemoteControl';
     StoreKeys['YNISON_INTERCEPT_PLAYBACK'] = 'ynisonInterceptPlayback';

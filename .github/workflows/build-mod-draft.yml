@@ -3,6 +3,10 @@ name: Build mod draft
 on:
     workflow_dispatch:
         inputs:
+            mod_version:
+                description: Overtone version (defaults to the version in package.json)
+                type: string
+                required: false
             smoke_test:
                 description: Launch Electron on the runner to check startup
                 type: boolean
@@ -62,18 +66,39 @@ jobs:
                   yarn test:release
                   if ($LASTEXITCODE -ne 0) { throw 'Release checks failed.' }
 
-            - name: Build and verify the portable ZIP
+            - name: Build the portable ZIP and Windows installer
               id: build
               env:
+                  OVERTONE_BUILD_VERSION: ${{ inputs.mod_version }}
                   OVERTONE_ELECTRON_SMOKE_TEST: ${{ inputs.smoke_test }}
               run: node toolset/ci/build-mod-draft.js
 
             - name: Upload portable ZIP
-              id: artifact
+              id: portable_artifact
               uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   path: ${{ steps.build.outputs.zip }}
                   archive: false
+                  if-no-files-found: error
+                  retention-days: 14
+
+            - name: Upload Windows installer
+              id: installer_artifact
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  path: ${{ steps.build.outputs.installer }}
+                  archive: false
+                  if-no-files-found: error
+                  retention-days: 14
+
+            - name: Upload SHA-256 checksums
+              id: checksum_artifact
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: windows-x64-checksums
+                  path: |
+                      ${{ steps.build.outputs.checksum }}
+                      ${{ steps.build.outputs.installerChecksum }}
                   if-no-files-found: error
                   retention-days: 14
 
@@ -86,10 +111,16 @@ jobs:
                   BUILD_SHA: ${{ steps.build.outputs.commit }}
                   ZIP_PATH: ${{ steps.build.outputs.zip }}
                   CHECKSUM_PATH: ${{ steps.build.outputs.checksum }}
+                  INSTALLER_PATH: ${{ steps.build.outputs.installer }}
+                  INSTALLER_CHECKSUM_PATH: ${{ steps.build.outputs.installerChecksum }}
                   NOTES_PATH: ${{ steps.build.outputs.notes }}
-                  ARTIFACT_URL: ${{ steps.artifact.outputs.artifact-url }}
+                  PORTABLE_ARTIFACT_URL: ${{ steps.portable_artifact.outputs.artifact-url }}
+                  INSTALLER_ARTIFACT_URL: ${{ steps.installer_artifact.outputs.artifact-url }}
+                  CHECKSUM_ARTIFACT_URL: ${{ steps.checksum_artifact.outputs.artifact-url }}
               run: |
-                  $releaseUrl = gh release create $env:DRAFT_TAG $env:ZIP_PATH $env:CHECKSUM_PATH --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --draft --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH
+                  $releaseUrl = gh release create $env:DRAFT_TAG $env:ZIP_PATH $env:CHECKSUM_PATH $env:INSTALLER_PATH $env:INSTALLER_CHECKSUM_PATH --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --draft --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH
                   if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
                   "[Черновик GitHub Release]($releaseUrl)" >> $env:GITHUB_STEP_SUMMARY
-                  "[Скачать ZIP из GitHub Actions]($env:ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+                  "[Скачать ZIP из GitHub Actions]($env:PORTABLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+                  "[Скачать установщик из GitHub Actions]($env:INSTALLER_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+                  "[Скачать контрольные суммы из GitHub Actions]($env:CHECKSUM_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY

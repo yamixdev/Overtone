@@ -36,25 +36,6 @@ export const windowSchema = defineSettingsSection({
         },
         {
             type: 'toggle',
-            key: `${WINDOW_PREFIX}hidePulseSyncVersionInTitleBar`,
-            defaultValue: false,
-            title: 'Скрывать версию PulseSync в TitleBar',
-            description: 'Скрывает подпись PulseSync в верхней панели окна.',
-            requiresPremium: true,
-            displayValue: (value, context) => value && context.premium.value,
-            badge: (context) => ({
-                label: 'Basic',
-                disabled: !context.premium.value,
-                tooltip: {
-                    title: 'Премиум функция',
-                    description: context.premium.value
-                        ? 'У вас есть подписка Basic'
-                        : 'Оформите Basic подписку, чтобы разблокировать',
-                },
-            }),
-        },
-        {
-            type: 'toggle',
             key: `${WINDOW_PREFIX}saveWindowDimensionsOnRestart`,
             defaultValue: false,
             title: 'Сохранять размер окна',

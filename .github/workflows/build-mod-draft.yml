@@ -22,6 +22,7 @@ jobs:
         timeout-minutes: 60
         env:
             NO_COLOR: 1
+            ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
         steps:
             - name: Checkout selected commit

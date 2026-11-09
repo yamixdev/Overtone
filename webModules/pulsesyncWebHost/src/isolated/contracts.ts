@@ -4,6 +4,7 @@ import type { DiagnosticError } from '../runtime/addonDiagnostics'
 
 export type IsolatedAddonAsset = {
     id: string
+    definitionId?: string
     name: string
     directoryName: string
     version?: string

@@ -159,6 +159,7 @@ const resolveCanonicalAddon = (snapshot, requestedAddonId) => {
     const code = validateCanonicalAddonCode(addonId, addon.code);
     return Object.freeze({
         id: addonId,
+        ...(addon.definitionId ? { definitionId: validateAddonId(addon.definitionId) } : {}),
         name: typeof addon.name === 'string' && addon.name.trim() ? addon.name : addonId,
         directoryName: typeof addon.directoryName === 'string' && addon.directoryName.trim() ? addon.directoryName : addonId,
         ...(typeof addon.version === 'string' ? { version: addon.version } : {}),

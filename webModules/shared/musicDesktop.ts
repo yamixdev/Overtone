@@ -5,6 +5,20 @@ type Subscription<Args extends unknown[]> = (listener: (...args: Args) => void) 
 type Snapshot = Record<string, unknown>;
 type StationResult = { ok?: boolean; reason?: string; [key: string]: unknown };
 
+export type LocalAddon = {
+    id: string;
+    name: string;
+    type: 'theme' | 'web-addon';
+    version: string;
+    enabled: boolean;
+    quarantined: boolean;
+};
+
+export type LocalAddonRequest =
+    | { action: 'list' | 'install' }
+    | { action: 'set-enabled'; id: string; enabled: boolean }
+    | { action: 'remove' | 'retry'; id: string };
+
 export type UgcLoudnessTrack = {
     id: string | number;
     durationMs: number;
@@ -44,6 +58,7 @@ export type PulseSyncDesktopBridge = {
         onOpenDeeplink: Subscription<[pathname: string]>;
     };
     addons: {
+        manageLocal?: (request: LocalAddonRequest) => Promise<LocalAddon[]>;
         getLegacySnapshot: <T = unknown>() => Promise<T>;
         getWebHostSnapshot: <T = unknown>() => Promise<T>;
         recover: <T = unknown>(

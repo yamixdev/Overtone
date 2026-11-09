@@ -8,6 +8,7 @@ const store_js_2 = require('../../types/store.js');
 const { Events } = require('../../types/events');
 const { setAllowedUrls } = require('../handlers/handleHeadersReceived/corsHandler.js');
 const { normalizeCanonicalSnapshot } = require('./isolatedAddonExecution.js');
+const { isLocalAddonId, localAddons } = require('./localAddons.js');
 const { app: electronApp } = require('electron');
 const moduleTransportFs = require('node:fs');
 const moduleTransportPath = require('node:path');
@@ -248,6 +249,7 @@ class PulseSyncManager extends EventEmitter {
         for (const runtime of ['legacy', 'webhost']) {
             const quarantine = runtime === 'legacy' ? this._addonRecoveryState.legacy.quarantine : this._addonRecoveryState.webHost.quarantine;
             for (const [id, entry] of Object.entries(quarantine)) {
+                if (runtime === 'webhost' && isLocalAddonId(id)) continue;
                 const asset = runtime === 'legacy' ? this.getCurrentLegacyScriptAsset(id) : this.getCurrentWebHostAsset(id);
                 if (!asset || asset.fingerprint !== entry.fingerprint || asset.isSystem) continue;
                 entries.push({
@@ -279,10 +281,13 @@ class PulseSyncManager extends EventEmitter {
             quarantine[id].failedAt = Date.now();
         }
         this.persistAddonRecoveryState();
+        if (runtime === 'webhost' && isLocalAddonId(id)) this.publishLocalAddons();
     }
 
     retryAddonRecovery(payload) {
-        if (!this.isAuthorized) throw new Error('PulseSync addon recovery requires authorization');
+        if (!this.isAuthorized && !(payload?.runtime === 'webhost' && isLocalAddonId(payload.id))) {
+            throw new Error('PulseSync addon recovery requires authorization');
+        }
         if (!this.webContents || this.webContents.isDestroyed() || this.isReloading) throw new Error('Yandex Music is not ready for addon recovery');
         const runtime = payload?.runtime;
         if (runtime !== 'legacy' && runtime !== 'webhost') throw new Error('Invalid addon recovery runtime');
@@ -355,7 +360,8 @@ class PulseSyncManager extends EventEmitter {
     getCurrentWebHostAsset(addonId) {
         const id = typeof addonId === 'string' ? addonId.trim() : '';
         if (!id) return null;
-        const addon = Array.isArray(this._webHostAddonsSnapshot?.addons) ? this._webHostAddonsSnapshot.addons.find((item) => item?.id === id) : null;
+        const addons = isLocalAddonId(id) ? localAddons.getActiveAssets() : this._webHostAddonsSnapshot?.addons;
+        const addon = addons?.find((item) => item.id === id);
         if (!addon) return null;
         return {
             ...addon,
@@ -503,7 +509,7 @@ class PulseSyncManager extends EventEmitter {
             }
             if (action === 'retry') {
                 if (!this._addonRecoveryState.webHost.quarantine[current.id]) {
-                    if (!this.isAuthorized) throw new Error('PulseSync addon recovery requires authorization');
+                    if (!this.isAuthorized && !isLocalAddonId(id)) throw new Error('PulseSync addon recovery requires authorization');
                     return { snapshot: this.getWebHostAddonsSnapshot() };
                 }
                 return this.retryAddonRecovery({ runtime: 'webhost', id: current.id, fingerprint: current.fingerprint });
@@ -513,6 +519,7 @@ class PulseSyncManager extends EventEmitter {
                 return {};
             }
             const quarantined = this.quarantineWebHostAsset(current, typeof payload.reason === 'string' ? payload.reason : 'webhost-runtime-failed', payload.details);
+            if (quarantined && isLocalAddonId(id)) this.publishLocalAddons();
             return { quarantined: Boolean(quarantined) };
         }
 
@@ -596,7 +603,11 @@ class PulseSyncManager extends EventEmitter {
 
         if (!changed) return;
 
-        if (!nextValue) this._addonRecoveryRetries.clear();
+        if (!nextValue) {
+            for (const retry of this._addonRecoveryRetries) {
+                if (!retry.startsWith('webhost:') || !isLocalAddonId(retry.slice('webhost:'.length))) this._addonRecoveryRetries.delete(retry);
+            }
+        }
 
         this.logger.info(`Authorization state changed: ${this.isAuthorized} (${source})`);
 
@@ -624,7 +635,7 @@ class PulseSyncManager extends EventEmitter {
         setAllowedUrls([]);
         this.publishLegacyAssets();
         if (!this.webContents.isDestroyed()) {
-            this.webContents.send(Events.PULSESYNC_WEBHOST_ADDONS, { runtime: 'isolated', hash: '', addons: [] });
+            this.webContents.send(Events.PULSESYNC_WEBHOST_ADDONS, this.getWebHostAddonsSnapshot());
         }
         if (hadActiveScripts && this.appLoaded && !this.isReloading && !this.webContents.isDestroyed()) {
             this.safeReload('authorization lost');
@@ -971,6 +982,7 @@ class PulseSyncManager extends EventEmitter {
         this.socket.on('ADDON_RECOVERY_RETRY', (payload, acknowledge) => {
             if (typeof acknowledge !== 'function') return;
             try {
+                if (isLocalAddonId(payload?.id)) throw new Error('Local addons are managed in Overtone');
                 this.retryAddonRecovery(payload);
                 acknowledge({ ok: true });
             } catch (error) {
@@ -1337,18 +1349,19 @@ class PulseSyncManager extends EventEmitter {
     }
 
     getWebHostAddonsSnapshot() {
-        if (!this.isAuthorized) return { runtime: 'isolated', hash: '', addons: [] };
-        const source = this._webHostAddonsSnapshot;
+        const source = this.isAuthorized ? this._webHostAddonsSnapshot : null;
+        const local = localAddons.getActiveAssets();
         const quarantine = this._addonRecoveryState.webHost.quarantine;
         const quarantineKey = JSON.stringify([quarantine, [...this._addonRecoveryRetries]]);
         let cached = this._webHostAddonsSnapshotCache;
 
-        if (!cached || cached.source !== source || cached.quarantineKey !== quarantineKey) {
+        if (!cached || cached.source !== source || cached.local !== local || cached.quarantineKey !== quarantineKey) {
             const addons = [];
             let recoveryChanged = false;
             let filtered = false;
 
-            for (const addon of Array.isArray(source?.addons) ? source.addons : []) {
+            const remote = (source?.addons ?? []).filter((addon) => !isLocalAddonId(addon.id));
+            for (const addon of [...remote, ...local]) {
                 const fingerprint = this.getWebHostAssetFingerprint(addon);
                 const entry = quarantine[addon.id];
                 if (addon.type === 'web-addon' && entry?.fingerprint === fingerprint && !this._addonRecoveryRetries.has(`webhost:${addon.id}`)) {
@@ -1365,9 +1378,10 @@ class PulseSyncManager extends EventEmitter {
             if (recoveryChanged) this.persistAddonRecoveryState();
             cached = {
                 source,
+                local,
                 quarantineKey: recoveryChanged ? JSON.stringify([quarantine, [...this._addonRecoveryRetries]]) : quarantineKey,
                 addons,
-                hash: filtered ? hashRecoveryAsset({ runtime: 'isolated', addons }) : source.hash,
+                hash: filtered || local.length ? hashRecoveryAsset({ source: source?.hash, addons }) : (source?.hash ?? ''),
             };
             this._webHostAddonsSnapshotCache = cached;
         }
@@ -1376,9 +1390,22 @@ class PulseSyncManager extends EventEmitter {
             runtime: 'isolated',
             hash: cached.hash,
             addons: cached.addons.map((addon) => ({ ...addon })),
-            clientCapabilities: source.clientCapabilities ?? [],
-            ...(Array.isArray(source.allowedUrls) ? { allowedUrls: [...source.allowedUrls] } : {}),
+            clientCapabilities: source?.clientCapabilities ?? [],
+            ...(Array.isArray(source?.allowedUrls) ? { allowedUrls: [...source.allowedUrls] } : {}),
         };
+    }
+
+    listLocalAddons() {
+        return localAddons.list().map((item) => {
+            const entry = this._addonRecoveryState.webHost.quarantine[item.id];
+            const current = entry ? this.getCurrentWebHostAsset(item.id) : null;
+            return { ...item, quarantined: Boolean(entry && current && entry.fingerprint === current.fingerprint) };
+        });
+    }
+
+    publishLocalAddons() {
+        if (!this.webContents || this.webContents.isDestroyed()) return;
+        this.webContents.send(Events.PULSESYNC_WEBHOST_ADDONS, this.getWebHostAddonsSnapshot());
     }
 
     publishLegacyAssets() {

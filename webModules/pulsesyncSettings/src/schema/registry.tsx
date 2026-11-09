@@ -3,6 +3,7 @@ import type { ModSettingsApi } from '../api/modSettings';
 import { AudioSettings } from '../features/audio/AudioSettings';
 import { GlobalShortcutsSettings } from '../features/global-shortcuts/GlobalShortcutsSettings';
 import { LastFmSettings } from '../features/lastfm/LastFmSettings';
+import { LocalAddonsSettings } from '../features/local-addons/LocalAddonsSettings';
 import { SchemaSettingsSection } from './SchemaSettingsSection';
 import { appSectionsSchema, appUpdatesSchema, downloaderSchema, playlistSchema } from './sections/general';
 import { crossfadeSchema } from './sections/crossfade';
@@ -55,6 +56,7 @@ export const SETTINGS_GROUPS = [
             schemaSection('downloader', 'Скачивание', downloaderSchema),
             schemaSection('application', 'Разделы приложения', appSectionsSchema),
             customSection('shortcuts', 'Горячие клавиши', ({ api }) => <GlobalShortcutsSettings api={api} />),
+            customSection('modifications', 'Модификации', () => <LocalAddonsSettings />),
         ],
     },
     {

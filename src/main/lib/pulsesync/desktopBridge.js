@@ -26,6 +26,7 @@ const createPulseSyncDesktopBridge = (subscribe) => ({
         onOpenDeeplink: (listener) => subscribe(Events.PULSESYNC_OPEN_SETTINGS_DEEPLINK, listener),
     },
     addons: {
+        manageLocal: (request) => ipcRenderer.invoke(Events.OVERTONE_LOCAL_ADDONS, request),
         getLegacySnapshot: () => ipcRenderer.invoke(Events.PULSESYNC_LEGACY_ASSETS_SNAPSHOT),
         getWebHostSnapshot: () => ipcRenderer.invoke(Events.PULSESYNC_WEBHOST_ADDONS_SNAPSHOT),
         recover: (request) => ipcRenderer.invoke(Events.PULSESYNC_ADDON_RECOVERY, request),

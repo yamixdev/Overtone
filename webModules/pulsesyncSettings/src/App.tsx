@@ -66,6 +66,7 @@ function App({ api }: AppProps = {}) {
     const [activeSection, setActiveSection] = useState<SettingsSectionId>('playlists');
     const [highlightedSettingId, setHighlightedSettingId] = useState<string>();
     const [searchQuery, setSearchQuery] = useState('');
+    const [restartNoticeRevision, setRestartNoticeRevision] = useState(0);
     const searchInputRef = useRef<HTMLInputElement>(null);
     const contentRef = useRef<HTMLDivElement>(null);
     const modSettingsApi = getModSettingsApi(api);
@@ -77,23 +78,22 @@ function App({ api }: AppProps = {}) {
         false,
     );
     const notifyRestartRequired = useCallback(() => {
-        if (!api) {
-            console.warn('[PulseSync Settings] API уведомлений недоступен');
-
-            return;
-        }
-
-        // The native settings page may not be mounted when the mod settings are open.
-        void api.notifications
-            .info('Для применения этой настройки требуется перезапуск приложения')
-            .catch((error: unknown) => {
-                api.logger.error('Не удалось показать уведомление о перезапуске', error);
-            });
-    }, [api]);
+        setRestartNoticeRevision((revision) => revision + 1);
+    }, []);
     const isInMyVibeCategory = MY_VIBE_SECTION_IDS.has(activeSection);
     const shouldRevealMyVibe = isInMyVibeCategory && activeSection !== 'vibe-behavior';
     const shouldOffsetModal = shouldRevealMyVibe && window.location.href === MAIN_PAGE_URL;
     const isSearching = Boolean(searchQuery.trim());
+
+    useEffect(() => {
+        if (!restartNoticeRevision) {
+            return;
+        }
+
+        const timeout = window.setTimeout(() => setRestartNoticeRevision(0), 4000);
+
+        return () => window.clearTimeout(timeout);
+    }, [restartNoticeRevision]);
 
     useEffect(() => {
         let active = true;
@@ -323,6 +323,9 @@ function App({ api }: AppProps = {}) {
                     </div>
                 </div>
             </section>
+            <div className={styles.restartNotice} role="status">
+                {restartNoticeRevision > 0 && <span>Для применения этой настройки требуется перезапуск приложения</span>}
+            </div>
         </div>
     );
 }

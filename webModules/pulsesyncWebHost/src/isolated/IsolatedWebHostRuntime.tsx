@@ -108,7 +108,7 @@ export class IsolatedWebHostRuntime {
             jsxRuntime,
             jsxDevRuntime,
             registerAddon: definition => this.registerAddon(definition),
-            unregisterAddon: addonId => String(addonId) === this.init.addon.id && this.unregisterCurrentAddon(),
+            unregisterAddon: addonId => String(addonId) === (this.init.addon.definitionId ?? this.init.addon.id) && this.unregisterCurrentAddon(),
             registerSlot: (slotName, element) => this.targets.registerSlot(slotName, element),
             getPulseSyncApi: () => this.bridge.pulsesyncApi,
             installAddon: async factory => {
@@ -235,10 +235,11 @@ export class IsolatedWebHostRuntime {
             throw new Error('PulseSync isolated addon disposed')
         }
 
-        const addonId = String(definition?.id ?? '').trim()
+        const { id: addonId, definitionId = addonId } = this.init.addon
+        const declaredId = String(definition?.id ?? '').trim()
 
-        if (addonId !== this.init.addon.id) {
-            throw new Error(`PulseSync isolated addon id mismatch: ${addonId || '<empty>'}`)
+        if (declaredId !== definitionId) {
+            throw new Error(`PulseSync isolated addon id mismatch: ${declaredId || '<empty>'}`)
         }
 
         const apiVersion = definition.apiVersion ?? WEB_HOST_API_VERSION

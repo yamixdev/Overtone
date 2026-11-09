@@ -66,6 +66,28 @@
     background: rgba(0, 0, 0, 0.2);
 }
 
+.restartNotice {
+    position: absolute;
+    inset-inline: var(--modal-viewport-inset);
+    inset-block-end: var(--modal-viewport-inset);
+    display: flex;
+    justify-content: center;
+    pointer-events: none;
+
+    > span {
+        min-inline-size: 0;
+        padding: 10px 16px;
+        border: 1px solid var(--ym-controls-color-secondary-outline-default-stroke, rgba(255, 255, 255, 0.08));
+        border-radius: var(--ym-radius-size-l, 12px);
+        background: var(--ym-background-color-primary-enabled-popover, #242424);
+        color: var(--ym-controls-color-primary-text-enabled, #fff);
+        font-size: var(--ym-font-size-label-m, 14px);
+        line-height: var(--ym-font-line-height-label-m, 20px);
+        text-align: center;
+        overflow-wrap: anywhere;
+    }
+}
+
 .modal {
     --modal-offset-x: 0px;
 

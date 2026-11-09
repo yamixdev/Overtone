@@ -54,6 +54,7 @@ const { getPulseSyncAppInstaller } = require('./lib/pulsesyncAppInstaller.js');
 const taskBarExtension_js_1 = require('./lib/taskBarExtension/taskBarExtension.js');
 const scrobbleManager_js_1 = require('./lib/scrobble/index.js');
 const { getPulseSyncManager } = require('./lib/pulsesync/PulseSyncManager.js');
+const { isLocalAddonId, localAddons } = require('./lib/pulsesync/localAddons.js');
 const { IsolatedAddonExecutionStore, resolveCanonicalAddon, validateChannelToken } = require('./lib/pulsesync/isolatedAddonExecution.js');
 const miniPlayer_js_1 = require('./lib/miniplayer/miniplayer.js');
 const discordRichPresence_js_1 = require('./lib/discordRichPresence.js');
@@ -1563,6 +1564,57 @@ const registerGlobalApplicationEvents = () => {
         }
     });
 
+    let localAddonOperationInProgress = false;
+    ipcRegistry.handle(events_js_1.Events.OVERTONE_LOCAL_ADDONS, async (event, request) => {
+        const window = mainWindow;
+        if (!window || event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) {
+            throw new Error('Local addon manager rejected an unknown sender');
+        }
+        const manager = pulseSyncManager_js_1 || getPulseSyncManager(window);
+        const { action, id } = request ?? {};
+        if (action === 'list') return manager.listLocalAddons();
+        if (localAddonOperationInProgress) throw new Error('Дождитесь завершения предыдущей операции.');
+
+        localAddonOperationInProgress = true;
+        try {
+            if (action === 'install') {
+                const selection = await electron_1.dialog.showOpenDialog(window, {
+                    title: 'Установить модификацию',
+                    filters: [{ name: 'Пакет модификации', extensions: ['pext'] }],
+                    properties: ['openFile'],
+                });
+                if (selection.canceled || !selection.filePaths[0]) return manager.listLocalAddons();
+                await localAddons.import(selection.filePaths[0]);
+            } else {
+                const item = isLocalAddonId(id) && manager.listLocalAddons().find((addon) => addon.id === id);
+                if (!item) throw new Error('Модификация не найдена.');
+                if (action === 'set-enabled' && typeof request.enabled === 'boolean') {
+                    localAddons.setEnabled(id, request.enabled);
+                } else if (action === 'retry' && item.quarantined) {
+                    const current = manager.getCurrentWebHostAsset(id);
+                    manager.retryAddonRecovery({ runtime: 'webhost', id, fingerprint: current.fingerprint });
+                    return manager.listLocalAddons();
+                } else if (action === 'remove') {
+                    const confirmation = await electron_1.dialog.showMessageBox(window, {
+                        type: 'question',
+                        message: `Удалить модификацию «${item.name}»?`,
+                        buttons: ['Удалить', 'Отмена'],
+                        defaultId: 1,
+                        cancelId: 1,
+                    });
+                    if (confirmation.response !== 0) return manager.listLocalAddons();
+                    localAddons.remove(id);
+                } else {
+                    throw new Error('Неизвестное действие с модификацией.');
+                }
+            }
+            manager.publishLocalAddons();
+            return manager.listLocalAddons();
+        } finally {
+            localAddonOperationInProgress = false;
+        }
+    });
+
     ipcRegistry.handle(events_js_1.Events.PULSESYNC_SHOW_TOAST, (event, payload) => {
         if (!mainWindow || event.sender !== mainWindow.webContents) throw new Error('PulseSync toast rejected an unknown sender');
 
@@ -1639,6 +1691,7 @@ const registerGlobalApplicationEvents = () => {
         const init = {
             addon: {
                 id: addon.id,
+                ...(addon.definitionId ? { definitionId: addon.definitionId } : {}),
                 name: addon.name,
                 directoryName: addon.directoryName,
                 ...(addon.version ? { version: addon.version } : {}),

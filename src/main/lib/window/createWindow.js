@@ -14,35 +14,30 @@ const deviceInfo_js_1 = require('../deviceInfo.js');
 const store_js_1 = require('../store.js');
 const pulsesyncDevConfig_js_1 = require('../pulsesyncDevConfig.js');
 const toggleWindowVisibility_js_1 = require('./toggleWindowVisibility.js');
+const { applyWindowZoom, getPreferredScale } = require('./windowZoom.js');
 
 const minBounds = {
     minWidth: 768,
     minHeight: 650,
 };
 
-const dimensions = (store_js_1.getModSettings()?.window?.saveWindowDimensionsOnRestart ?? true) ? store_js_1.getWindowDimensions() : undefined;
-let position = store_js_1.getModSettings()?.window?.saveWindowPositionOnRestart ? store_js_1.getWindowPosition() : undefined;
-const isWithinDisplayBounds = (pos, display) => {
-    const area = display.workArea;
-    return pos.x >= area.x && pos.y >= area.y && pos.x < area.x + area.width && pos.y < area.y + area.height;
-};
+const clamp = (value, min, max) => Math.min(max, Math.max(min, value));
+const restoredSize = (value, fallback) => (Number.isSafeInteger(value) && value > 0 ? value : fallback);
 
 const createWindow = async () => {
     const withFrame = [platform_js_1.Platform.WINDOWS, platform_js_1.Platform.MACOS].includes(deviceInfo_js_1.devicePlatform);
-    let scaleFactor = 1;
-    if (position) {
-        const primaryDisplay = electron_1.screen.getPrimaryDisplay(),
-            nearestDisplay = electron_1.screen.getDisplayNearestPoint(position);
-        scaleFactor = 1 / (nearestDisplay?.scaleFactor ?? primaryDisplay.scaleFactor);
-        if (!isWithinDisplayBounds(position, nearestDisplay)) {
-            position = undefined;
-        }
-        const usedDisplay = nearestDisplay ?? primaryDisplay;
-        store_js_1.setWindowMonitor(usedDisplay.id);
-    } else {
-        const primaryDisplay = electron_1.screen.getPrimaryDisplay();
-        store_js_1.setWindowMonitor(primaryDisplay.id);
-    }
+    const settings = store_js_1.getModSettings()?.window;
+    const dimensions = settings?.saveWindowDimensionsOnRestart !== false ? store_js_1.getWindowDimensions() : undefined;
+    const position = settings?.saveWindowPositionOnRestart !== false ? store_js_1.getWindowPosition() : undefined;
+    const hasPosition = Number.isInteger(position?.x) && Number.isInteger(position?.y);
+    const display = hasPosition ? electron_1.screen.getDisplayNearestPoint(position) : electron_1.screen.getPrimaryDisplay();
+    const { workArea } = display;
+    const minWidth = Math.min(minBounds.minWidth, workArea.width);
+    const minHeight = Math.min(minBounds.minHeight, workArea.height);
+    const width = clamp(restoredSize(dimensions?.width, 1280), minWidth, workArea.width);
+    const height = clamp(restoredSize(dimensions?.height, 800), minHeight, workArea.height);
+    store_js_1.setWindowMonitor(display.id);
+
     const window = new electron_1.BrowserWindow({
         show: false,
         frame: withFrame,
@@ -52,10 +47,16 @@ const createWindow = async () => {
             x: 16,
             y: 10,
         },
-        ...minBounds,
-        width: (dimensions?.width ?? 1280) * scaleFactor,
-        height: (dimensions?.height ?? 800) * scaleFactor,
-        ...(position ? { x: position.x, y: position.y } : { center: true }),
+        minWidth,
+        minHeight,
+        width,
+        height,
+        ...(hasPosition
+            ? {
+                  x: clamp(position.x, workArea.x, workArea.x + workArea.width - width),
+                  y: clamp(position.y, workArea.y, workArea.y + workArea.height - height),
+              }
+            : { center: true }),
         webPreferences: {
             devTools: config_js_1.config.app.enableDevTools || store_js_1.getDevMode() || pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled,
             webSecurity: config_js_1.config.app.enableWebSecurity,
@@ -66,6 +67,7 @@ const createWindow = async () => {
             autoplayPolicy: 'no-user-gesture-required',
             preload: node_path_1.default.join(__dirname, '..', 'preload.js'),
             backgroundThrottling: false,
+            zoomFactor: getPreferredScale() / 100,
         },
     });
     window.isMainWindow = true;
@@ -73,8 +75,7 @@ const createWindow = async () => {
         const shouldShow = !(store_js_1.getModSettings()?.window?.minimizedStart ?? false);
 
         if ((dimensions?.maximized ?? false) && shouldShow) window.maximize();
-        window.setSize(dimensions?.width ?? 1280, dimensions?.height ?? 800);
-
+        applyWindowZoom(window);
         (0, toggleWindowVisibility_js_1.toggleWindowVisibility)(window, shouldShow);
     });
     return window;

@@ -13858,8 +13858,22 @@
                 o6 = D.gK.model('TranslationsModel', { data: D.gK.frozen() }),
                 o4 = D.gK
                     .model('ReleaseNotes', { modal: se.q, translations: D.gK.maybeNull(o6), sortedDescReleaseNotesKeys: D.gK.maybeNull(D.gK.array(D.gK.string)) })
+                    // for PulseSync: BEGIN track Overtone notes in the shared release notes model
+                    .volatile(() => ({ overtone: null, source: 'yandex' }))
+                    .actions((e) => ({
+                        setOvertone(notes) {
+                            e.overtone = notes;
+                        },
+                        setSource(source) {
+                            e.source = source;
+                        },
+                    }))
+                    // for PulseSync: END track Overtone notes in the shared release notes model
                     .views((e) => ({
                         get isReady() {
+                            // for PulseSync: BEGIN enable the version badge with local Overtone notes
+                            if (e.overtone?.entries.length) return true;
+                            // for PulseSync: END enable the version badge with local Overtone notes
                             var t;
                             return !!(
                                 (null == (t = e.translations) ? void 0 : t.data) &&

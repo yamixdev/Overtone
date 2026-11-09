@@ -108,6 +108,43 @@
     padding-inline-start: 0.1875rem;
     text-align: center;
 }
+/* for PulseSync: BEGIN style the Overtone release notes source selector and copy */
+.OvertoneReleaseNotes_dialog {
+    display: flex;
+    flex-direction: column;
+}
+.OvertoneReleaseNotes_dialog .ReleaseNotesModal_modalHeader__gp9SA {
+    display: grid;
+    flex-shrink: 0;
+    grid-template-columns: minmax(0, 1fr) auto;
+    row-gap: var(--ym-spacer-size-xs);
+}
+.OvertoneReleaseNotes_sources {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--ym-spacer-size-xs);
+    grid-area: 2 / 1 / 3 / -1;
+}
+.OvertoneReleaseNotes_dialog .ReleaseNotesModal_modalContent__g8OTu {
+    flex: 1;
+    max-height: none;
+    min-height: 0;
+}
+.OvertoneReleaseNotes_scroll {
+    flex: 1;
+    min-height: 0;
+}
+.OvertoneReleaseNotes_date {
+    margin-block-end: var(--ym-spacer-size-xs);
+}
+.OvertoneReleaseNotes_paragraph {
+    margin: 0;
+    overflow-wrap: anywhere;
+}
+.OvertoneReleaseNotes_paragraph + .OvertoneReleaseNotes_paragraph {
+    margin-block-start: var(--ym-spacer-size-xs);
+}
+/* for PulseSync: END style the Overtone release notes source selector and copy */
 .NotificationsInitializer_toastClassName__ZVvrd {
     margin-block-end: var(--ym-spacer-size-m) !important;
 }

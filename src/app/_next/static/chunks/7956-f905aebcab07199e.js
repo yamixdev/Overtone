@@ -1457,6 +1457,38 @@
                 B = t(51611),
                 Z = t(17643),
                 $ = t.n(Z);
+            // for PulseSync: BEGIN display local Overtone release notes
+            const overtoneNoteDate = new Intl.DateTimeFormat('ru-RU', { dateStyle: 'long', timeZone: 'UTC' });
+            const OvertoneNotes = ({ entries, unseenVersion }) => {
+                (0, a.useEffect)(() => {
+                    if (!unseenVersion) return;
+                    const acknowledgeWhenVisible = () => {
+                        if (document.visibilityState !== 'visible') return;
+                        document.removeEventListener('visibilitychange', acknowledgeWhenVisible);
+                        window.musicDesktop.app.markOvertoneReleaseNotesSeen(unseenVersion).catch((error) => {
+                            console.warn('Could not acknowledge Overtone release notes', error);
+                        });
+                    };
+                    document.addEventListener('visibilitychange', acknowledgeWhenVisible);
+                    acknowledgeWhenVisible();
+                    return () => document.removeEventListener('visibilitychange', acknowledgeWhenVisible);
+                }, [unseenVersion]);
+                return entries.map(({ version, date, paragraphs }) =>
+                    (0, l.jsxs)(
+                        'div',
+                        {
+                            className: $().note,
+                            children: [
+                                (0, l.jsx)(N.DZ, { variant: 'h4', className: (0, C.$)($().version, $().important), children: version }),
+                                (0, l.jsx)('time', { className: 'OvertoneReleaseNotes_date', dateTime: date, children: overtoneNoteDate.format(new Date(date)) }),
+                                ...paragraphs.map((paragraph) => (0, l.jsx)('p', { className: 'OvertoneReleaseNotes_paragraph', children: paragraph }, paragraph)),
+                            ],
+                        },
+                        version,
+                    ),
+                );
+            };
+            // for PulseSync: END display local Overtone release notes
             let K = {
                     ul: (e) => (0, l.jsx)('ul', { className: $().description, children: e }),
                     li: (e) => (0, l.jsx)('li', { className: $().item, children: e }),
@@ -1466,12 +1498,14 @@
                     br: (0, l.jsx)('br', {}),
                 },
                 F = (0, w.PA)(() => {
-                    let {
-                            releaseNotes: { translations: e, sortedDescReleaseNotesKeys: L, modal: t },
-                        } = (0, S.g)(),
+                    // for PulseSync: BEGIN switch sources in the native release notes dialog
+                    let { releaseNotes } = (0, S.g)(),
+                        { translations: e, sortedDescReleaseNotesKeys: L, modal: t, overtone, source } = releaseNotes,
                         { formatMessage: o } = (0, H.A)(),
                         { language: a, defaultLanguage: r } = (0, B.h)(),
                         n = (0, U.C)();
+                    const hasOvertoneNotes = Boolean(overtone?.entries.length);
+                    const showOvertone = hasOvertoneNotes && source === 'overtone';
                     return (0, l.jsx)(M.a, {
                         title: o({ id: 'desktop.release-notes-modal-title' }),
                         open: t.isOpened,
@@ -1482,49 +1516,86 @@
                         overlayClassName: $().modalOverlay,
                         overlayColor: 'full',
                         labelClose: o({ id: 'interface-actions.close' }),
-                        className: $().root,
+                        className: (0, C.$)($().root, hasOvertoneNotes && 'OvertoneReleaseNotes_dialog'),
                         headerClassName: $().modalHeader,
                         contentClassName: $().modalContent,
                         'data-test-id': g.Kq.releaseNotes.RELEASE_NOTES_MODAL,
                         closeButtonDataTestId: g.Kq.releaseNotes.RELEASE_NOTES_MODAL_CLOSE_BUTTON,
-                        children: (0, l.jsx)(O.A, {
-                            onError: n,
-                            defaultLocale: r,
-                            locale: a,
-                            messages: null == e ? void 0 : e.data,
-                            children: (0, l.jsx)(P.N, {
-                                className: (0, C.$)($().scrollableContent, $().important),
-                                containerClassName: (0, C.$)($().notes, $().important),
-                                children:
-                                    null == L
-                                        ? void 0
-                                        : L.map((e) =>
-                                              (0, l.jsxs)(
-                                                  'div',
-                                                  {
-                                                      className: $().note,
-                                                      children: [
-                                                          (0, l.jsx)(N.DZ, {
-                                                              variant: 'h4',
-                                                              className: (0, C.$)($().version, $().important),
-                                                              'data-test-id': g.Kq.releaseNotes.RELEASE_NOTES_VERSION,
-                                                              children: ((e) => {
-                                                                  var L;
-                                                                  return null != (L = e.split('desktop-release-notes.')[1]) ? L : '';
-                                                              })(e),
-                                                          }),
-                                                          (0, l.jsx)('div', {
-                                                              'data-test-id': g.Kq.releaseNotes.RELEASE_NOTES_TEXT,
-                                                              children: (0, l.jsx)(I.A, { id: e, values: K }),
-                                                          }),
-                                                      ],
-                                                  },
-                                                  e,
-                                              ),
-                                          ),
+                        header:
+                            hasOvertoneNotes &&
+                            (0, l.jsx)('div', {
+                                className: 'OvertoneReleaseNotes_sources',
+                                role: 'group',
+                                'aria-label': 'Источник заметок об обновлении',
+                                children: [
+                                    ['yandex', 'Яндекс Музыка'],
+                                    ['overtone', 'Overtone'],
+                                ].map(([id, label]) =>
+                                    (0, l.jsx)(
+                                        x.$,
+                                        {
+                                            variant: source === id ? 'default' : 'outline',
+                                            color: 'secondary',
+                                            size: 'xs',
+                                            radius: 'xxxl',
+                                            'aria-pressed': source === id,
+                                            onClick: () => releaseNotes.setSource(id),
+                                            children: label,
+                                        },
+                                        id,
+                                    ),
+                                ),
                             }),
-                        }),
+                        children: (0, l.jsx)(
+                            P.N,
+                            {
+                                className: (0, C.$)($().scrollableContent, $().important, 'OvertoneReleaseNotes_scroll'),
+                                containerClassName: (0, C.$)($().notes, $().important),
+                                children: showOvertone
+                                    ? (0, l.jsx)(OvertoneNotes, {
+                                          entries: overtone.entries,
+                                          unseenVersion: t.isOpened && overtone.showOnStartup ? overtone.currentVersion : null,
+                                      })
+                                    : L?.length
+                                      ? (0, l.jsx)(O.A, {
+                                            onError: n,
+                                            defaultLocale: r,
+                                            locale: a,
+                                            messages: e?.data,
+                                            children: L.map((e) =>
+                                                (0, l.jsxs)(
+                                                    'div',
+                                                    {
+                                                        className: $().note,
+                                                        children: [
+                                                            (0, l.jsx)(N.DZ, {
+                                                                variant: 'h4',
+                                                                className: (0, C.$)($().version, $().important),
+                                                                'data-test-id': g.Kq.releaseNotes.RELEASE_NOTES_VERSION,
+                                                                children: ((e) => {
+                                                                    var L;
+                                                                    return null != (L = e.split('desktop-release-notes.')[1]) ? L : '';
+                                                                })(e),
+                                                            }),
+                                                            (0, l.jsx)('div', {
+                                                                'data-test-id': g.Kq.releaseNotes.RELEASE_NOTES_TEXT,
+                                                                children: (0, l.jsx)(I.A, { id: e, values: K }),
+                                                            }),
+                                                        ],
+                                                    },
+                                                    e,
+                                                ),
+                                            ),
+                                        })
+                                      : (0, l.jsx)('p', {
+                                            className: 'OvertoneReleaseNotes_paragraph',
+                                            children: 'Заметки Яндекс Музыки пока недоступны.',
+                                        }),
+                            },
+                            showOvertone ? 'overtone' : 'yandex',
+                        ),
                     });
+                    // for PulseSync: END switch sources in the native release notes dialog
                 });
             var z = t(69704),
                 W = t(97956),
@@ -1569,24 +1640,50 @@
                         let { theme: L } = (0, z.W)(),
                             t = (0, D.N)().get(j.vg);
                         ((() => {
-                            let [e, L] = (0, a.useState)(!1),
-                                {
-                                    releaseNotes: { setTranslationsReleaseNotes: t, isReady: o, modal: l, setSortedDescReleaseNotesKeys: r },
-                                } = (0, S.g)(),
-                                n = (0, a.useCallback)(
-                                    (e) => {
-                                        let { needToShowReleaseNotes: o, sortedDescReleaseNotesKeys: l, translationsReleaseNotes: a } = e;
-                                        (t(a), r(l), o && L(!0));
-                                    },
-                                    [r, t],
-                                );
-                            ((0, a.useEffect)(() => {
-                                e && o && (l.open(), L(!1));
-                            }, [o, l, e]),
-                                (0, a.useEffect)(() => {
-                                    var e;
-                                    return null == (e = window.musicDesktop) ? void 0 : e.app.onLoadReleaseNotes(n);
-                                }, [n]));
+                            // for PulseSync: BEGIN choose a single release notes source on startup
+                            const { releaseNotes } = (0, S.g)();
+                            (0, a.useEffect)(() => {
+                                const app = window.musicDesktop?.app;
+                                if (!app) return;
+                                let active = true;
+                                let overtoneChecked = false;
+                                let openedOvertone = false;
+                                let showYandex = false;
+                                const openYandexIfReady = () => {
+                                    if (!overtoneChecked || openedOvertone || !showYandex) return;
+                                    showYandex = false;
+                                    if (!releaseNotes.modal.isOpened) {
+                                        releaseNotes.setSource('yandex');
+                                        releaseNotes.modal.open();
+                                    }
+                                };
+                                const unsubscribe = app.onLoadReleaseNotes(({ needToShowReleaseNotes, sortedDescReleaseNotesKeys, translationsReleaseNotes }) => {
+                                    releaseNotes.setTranslationsReleaseNotes(translationsReleaseNotes);
+                                    releaseNotes.setSortedDescReleaseNotesKeys(sortedDescReleaseNotesKeys);
+                                    showYandex ||= needToShowReleaseNotes;
+                                    openYandexIfReady();
+                                });
+                                app.getOvertoneReleaseNotes()
+                                    .then((notes) => {
+                                        if (!active) return;
+                                        releaseNotes.setOvertone(notes);
+                                        if (notes?.showOnStartup) {
+                                            openedOvertone = true;
+                                            releaseNotes.setSource('overtone');
+                                            releaseNotes.modal.open();
+                                        }
+                                    })
+                                    .catch((error) => console.warn('Could not load Overtone release notes', error))
+                                    .finally(() => {
+                                        overtoneChecked = true;
+                                        if (active) openYandexIfReady();
+                                    });
+                                return () => {
+                                    active = false;
+                                    unsubscribe();
+                                };
+                            }, [releaseNotes]);
+                            // for PulseSync: END choose a single release notes source on startup
                         })(),
                             (() => {
                                 let { notify: e, dismiss: L } = (0, f.l)(),

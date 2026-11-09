@@ -146,8 +146,10 @@ const init = () => {
             minimizedStart: false,
             preventDisplaySleep: false,
             startupPage: '/',
-            saveWindowDimensionsOnRestart: false,
-            saveWindowPositionOnRestart: false,
+            saveWindowDimensionsOnRestart: true,
+            saveWindowPositionOnRestart: true,
+            interfaceScale: 100,
+            fitInterfaceToWindow: true,
         },
         globalShortcuts: {
             enable: true,

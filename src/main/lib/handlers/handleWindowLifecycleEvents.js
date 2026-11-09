@@ -12,6 +12,7 @@ const events_js_1 = require('../../events.js');
 const config_js_1 = require('../../config.js');
 const store_js_1 = require('../store.js');
 const tray_js_1 = require('../tray.js');
+const { applyWindowZoom } = require('../window/windowZoom.js');
 const lifecycleLogger = new Logger_js_1.Logger('WindowLifecycle');
 const USER_ID_IFRAME_URL_REGEXP = /^https:\/\/yandex.\w{2,3}\/user-id/;
 const NAVIGATION_ABORTED_ERROR_CODE = -3;
@@ -24,41 +25,6 @@ const checkAndUpdateApplicationData = (window) => {
 };
 const setBlurredTime = () => {
     state_js_1.state.lastWindowBlurredOrHiddenTime = Date.now();
-};
-
-let resizeCorrectionTimer = null;
-let isApplyingEvenCorrection = false;
-
-const updateWindowDimensions = (window) => {
-    const applyCorrection = () => {
-        if (window.isDestroyed() || window.isFullScreen()) return;
-        const [w, h] = window.getSize();
-        const evenW = w & ~1;
-        const evenH = h & ~1;
-
-        if (w !== evenW || h !== evenH) {
-            isApplyingEvenCorrection = true;
-            window.setSize(evenW, evenH);
-            isApplyingEvenCorrection = false;
-        }
-
-        store_js_1.setWindowDimensions(evenW, evenH, window.isMaximized());
-    };
-
-    if (deviceInfo_js_1.devicePlatform === platform_js_1.Platform.LINUX) {
-        if (resizeCorrectionTimer) {
-            clearTimeout(resizeCorrectionTimer);
-        }
-
-        resizeCorrectionTimer = setTimeout(() => {
-            applyCorrection();
-            resizeCorrectionTimer = null;
-        }, 50);
-
-        return;
-    }
-
-    applyCorrection();
 };
 
 const { authDiagnostics } = require('../authDiagnostics.js');
@@ -98,6 +64,29 @@ const classifyNavigationPage = (value) => {
     }
 };
 const handleWindowLifecycleEvents = (window) => {
+    let lastDimensions = store_js_1.getWindowDimensions();
+    let lastPosition = store_js_1.getWindowPosition();
+    let placementTimer;
+    const saveWindowPlacement = () => {
+        clearTimeout(placementTimer);
+        if (window.isDestroyed()) return;
+        const { x, y, width, height } = window.getNormalBounds();
+        const maximized = window.isFullScreen() || window.isMinimized() ? (lastDimensions?.maximized ?? false) : window.isMaximized();
+        if (lastDimensions?.width !== width || lastDimensions?.height !== height || lastDimensions?.maximized !== maximized) {
+            store_js_1.setWindowDimensions(width, height, maximized);
+            lastDimensions = { width, height, maximized };
+        }
+        if (lastPosition?.x !== x || lastPosition?.y !== y) {
+            store_js_1.setWindowPosition(x, y);
+            lastPosition = { x, y };
+        }
+    };
+    const queueWindowPlacementSave = () => {
+        clearTimeout(placementTimer);
+        placementTimer = setTimeout(saveWindowPlacement, 150);
+    };
+    const updateWindowZoom = () => applyWindowZoom(window);
+
     electron_1.app.on('activate', () => {
         (0, toggleWindowVisibility_js_1.toggleWindowVisibility)(window, true);
     });
@@ -131,32 +120,33 @@ const handleWindowLifecycleEvents = (window) => {
     });
     window.on('maximize', () => {
         checkAndUpdateApplicationData(window);
-        updateWindowDimensions(window);
+        saveWindowPlacement();
+        updateWindowZoom();
         state_js_1.state.isMinimized = false;
         (0, tray_js_1.updateTrayMenu)(window);
     });
     window.on('unmaximize', () => {
-        updateWindowDimensions(window);
+        saveWindowPlacement();
+        updateWindowZoom();
         state_js_1.state.isMinimized = false;
         (0, tray_js_1.updateTrayMenu)(window);
     });
     window.on('restore', () => {
         checkAndUpdateApplicationData(window);
+        updateWindowZoom();
         state_js_1.state.isMinimized = false;
         (0, tray_js_1.updateTrayMenu)(window);
     });
-    window.on('resized', () => {
-        if (isApplyingEvenCorrection) {
-            return;
-        }
-        updateWindowDimensions(window);
+    window.on('resize', () => {
+        updateWindowZoom();
+        queueWindowPlacementSave();
     });
-    window.on('moved', () => {
-        if (window.isFullScreen()) return;
-        const position = window.getPosition();
-        store_js_1.setWindowPosition(position[0], position[1]);
-    });
+    window.on('move', queueWindowPlacementSave);
+    window.on('enter-full-screen', updateWindowZoom);
+    window.on('leave-full-screen', updateWindowZoom);
+    window.once('closed', () => clearTimeout(placementTimer));
     window.on('close', (event) => {
+        saveWindowPlacement();
         if (deviceInfo_js_1.devicePlatform !== platform_js_1.Platform.MACOS) {
             return;
         }
@@ -207,6 +197,7 @@ const handleWindowLifecycleEvents = (window) => {
         }
     });
     webContents.on('did-finish-load', () => {
+        updateWindowZoom();
         webContents.insertCSS(`
                 body {
                     .passp-page {

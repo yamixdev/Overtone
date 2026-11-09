@@ -16,6 +16,8 @@ var IpcChannel = ((IpcChannel2) => {
     IpcChannel2['FIRST_LAUNCH'] = 'desktop:application:first-launch';
     IpcChannel2['PROBABILITY_BUCKET'] = 'desktop:application:probability-bucket';
     IpcChannel2['LOAD_RELEASE_NOTES'] = 'desktop:application:load-release-notes';
+    IpcChannel2['GET_OVERTONE_RELEASE_NOTES'] = 'desktop:application:get-overtone-release-notes';
+    IpcChannel2['MARK_OVERTONE_RELEASE_NOTES_SEEN'] = 'desktop:application:mark-overtone-release-notes-seen';
     IpcChannel2['PLAYER_STATE'] = 'desktop:player:state';
     IpcChannel2['DISCORD_PLAYBACK_PROGRESS'] = 'desktop:player:discord-progress';
     IpcChannel2['PLAYER_DIAGNOSTIC'] = 'desktop:player:diagnostic';

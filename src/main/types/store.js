@@ -4,6 +4,7 @@ exports.StoreKeys = void 0;
 var StoreKeys;
 (function (StoreKeys) {
     StoreKeys['VERSION'] = 'version';
+    StoreKeys['SEEN_OVERTONE_RELEASE_NOTES'] = 'seenOvertoneReleaseNotes';
     StoreKeys['HAS_RECENTLY_LAUNCHED'] = 'hasRecentlyLaunched';
     StoreKeys['UUID'] = 'uuid';
     StoreKeys['DEVICE_ID'] = 'deviceId';

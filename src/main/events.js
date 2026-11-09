@@ -25,6 +25,7 @@ const { authDiagnostics, readPassportLoginWithDiagnostics } = require('./lib/aut
 const { isPngSavePayload } = require('./lib/desktopPayloads.js');
 const { handleSavePngImageToLocalDisk } = require('./lib/savePng.js');
 const { setOfflineSyncConfig } = require('./lib/offlineSyncConfig.js');
+const windowZoom = require('./lib/window/windowZoom.js');
 let ipcRegistry;
 const events_js_1 = require('./types/events.js');
 const cookies_js_1 = require('./constants/cookies.js');
@@ -39,6 +40,7 @@ const toggleMaximize_js_1 = require('./lib/window/toggleMaximize.js');
 const minimize_js_1 = require('./lib/window/minimize.js');
 const handleDeeplink_js_1 = require('./lib/handlers/handleDeeplink.js');
 const loadReleaseNotes_js_1 = require('./lib/loadReleaseNotes.js');
+const { getOvertoneReleaseNotes, markOvertoneReleaseNotesSeen } = require('./lib/releaseNotes/overtoneReleaseNotes.js');
 const deviceInfo_js_1 = require('./lib/deviceInfo.js');
 const pulsesyncDevConfig_js_1 = require('./lib/pulsesyncDevConfig.js');
 
@@ -880,6 +882,8 @@ const handleApplicationEvents = (window) => {
         if (event.sender !== window.webContents) throw new Error('PulseSync addon recovery rejected an unknown sender');
         return pulseSyncManager_js_1.handleAddonRecoveryRequest(payload);
     });
+    ipcRegistry.handle(IpcChannel.GET_OVERTONE_RELEASE_NOTES, () => getOvertoneReleaseNotes());
+    ipcRegistry.handle(IpcChannel.MARK_OVERTONE_RELEASE_NOTES_SEEN, (_event, version) => markOvertoneReleaseNotesSeen(version));
     ipcRegistry.on(IpcChannel.APPLICATION_READY, async (event, language) => {
         eventsLogger.info('Event received', IpcChannel.APPLICATION_READY);
 
@@ -1152,7 +1156,9 @@ const handleApplicationEvents = (window) => {
     });
 
     const setNativeStoreValue = (key, value) => {
+        if (key === windowZoom.INTERFACE_SCALE_KEY) return windowZoom.setPreferredScale(window, value);
         store_js_1.set(key, value);
+        if (key === windowZoom.FIT_INTERFACE_TO_WINDOW_KEY) windowZoom.applyWindowZoom(window);
         if (key === 'modSettings.r128Normalization' && value !== true) ugcLoudness.cancelPending();
         if ('string' == typeof key && ('modSettings.globalShortcuts' === key || key.startsWith('modSettings.globalShortcuts.'))) {
             updateGlobalShortcuts();
@@ -1391,20 +1397,23 @@ exports.sendNativeStoreUpdate = sendNativeStoreUpdate;
 
 const zoomIn = () => {
     eventsLogger.info('Event handle', 'zoom-in');
-    return (mainWindow.webContents.zoomFactor = Math.min(mainWindow.webContents.zoomFactor + 0.05, 2.0));
+    windowZoom.setPreferredScale(mainWindow, windowZoom.getPreferredScale() + 5);
+    return mainWindow.webContents.zoomFactor;
 };
 
 exports.zoomIn = zoomIn;
 
 const zoomOut = () => {
     eventsLogger.info('Event handle', 'zoom-out');
-    return (mainWindow.webContents.zoomFactor = Math.max(mainWindow.webContents.zoomFactor - 0.05, 0.75));
+    windowZoom.setPreferredScale(mainWindow, windowZoom.getPreferredScale() - 5);
+    return mainWindow.webContents.zoomFactor;
 };
 exports.zoomOut = zoomOut;
 
 const resetZoom = () => {
     eventsLogger.info('Event handle', 'reset-zoom');
-    return (mainWindow.webContents.zoomFactor = 1.0);
+    windowZoom.setPreferredScale(mainWindow, 100);
+    return mainWindow.webContents.zoomFactor;
 };
 
 exports.resetZoom = resetZoom;
@@ -1418,7 +1427,8 @@ exports.getZoomLevel = getZoomLevel;
 
 const setZoomLevel = (event, level) => {
     eventsLogger.info('Event handle', 'set-zoom-level', level);
-    return (mainWindow.webContents.zoomFactor = Math.min(Math.max(level ?? 1.0, 0.75), 2.0));
+    windowZoom.setPreferredScale(mainWindow, typeof level === 'number' ? level * 100 : 100);
+    return mainWindow.webContents.zoomFactor;
 };
 
 const registerGlobalApplicationEvents = () => {

@@ -51,6 +51,8 @@ const createMusicDesktopBridge = (runtime) => ({
         onFirstLaunch: (listener) => subscribe(IpcChannel.FIRST_LAUNCH, listener),
         onProbabilityBucket: (listener) => subscribe(IpcChannel.PROBABILITY_BUCKET, listener),
         onLoadReleaseNotes: (listener) => subscribe(IpcChannel.LOAD_RELEASE_NOTES, listener),
+        getOvertoneReleaseNotes: () => electron.ipcRenderer.invoke(IpcChannel.GET_OVERTONE_RELEASE_NOTES),
+        markOvertoneReleaseNotesSeen: (version) => electron.ipcRenderer.invoke(IpcChannel.MARK_OVERTONE_RELEASE_NOTES_SEEN, version),
     },
     authorization: {
         getPassportLogin: () => electron.ipcRenderer.invoke(IpcChannel.GET_PASSPORT_LOGIN),

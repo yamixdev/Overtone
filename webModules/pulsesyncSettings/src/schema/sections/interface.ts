@@ -41,12 +41,31 @@ export const modAppearanceSchema = defineSettingsSection({
 
 export const windowSchema = defineSettingsSection({
     title: 'Поведение окна',
-    requiresPremium: true,
     watch: [
         { key: SHOW_NON_MUSIC_PAGE_KEY, defaultValue: true },
         { key: SHOW_CONCERTS_TAB_KEY, defaultValue: true },
     ],
     items: [
+        {
+            type: 'slider',
+            key: `${WINDOW_PREFIX}interfaceScale`,
+            defaultValue: 100,
+            title: 'Масштаб интерфейса',
+            description:
+                'Общий масштаб Яндекс Музыки для оконного и развёрнутого режима. Сохраняется после перезапуска.',
+            min: 75,
+            max: 200,
+            step: 5,
+            valueLabel: (value) => `${value}%`,
+        },
+        {
+            type: 'toggle',
+            key: `${WINDOW_PREFIX}fitInterfaceToWindow`,
+            defaultValue: true,
+            title: 'Подгонять интерфейс под окно',
+            description:
+                'При сужении окна масштаб может уменьшиться до 85%. Дальше интерфейс переходит в компактную раскладку.',
+        },
         {
             type: 'select',
             key: `${WINDOW_PREFIX}startupPage`,
@@ -66,14 +85,14 @@ export const windowSchema = defineSettingsSection({
         {
             type: 'toggle',
             key: `${WINDOW_PREFIX}saveWindowDimensionsOnRestart`,
-            defaultValue: false,
+            defaultValue: true,
             title: 'Сохранять размер окна',
             description: 'Сохраняет размер окна при перезапуске',
         },
         {
             type: 'toggle',
             key: `${WINDOW_PREFIX}saveWindowPositionOnRestart`,
-            defaultValue: false,
+            defaultValue: true,
             title: 'Сохранять положение окна',
             description: 'Сохраняет положение окна при перезапуске',
         },

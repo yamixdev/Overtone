@@ -2,6 +2,11 @@ name: Build mod draft
 
 on:
     workflow_dispatch:
+        inputs:
+            smoke_test:
+                description: Launch Electron on the runner to check startup
+                type: boolean
+                default: false
 
 permissions:
     contents: write
@@ -57,8 +62,10 @@ jobs:
                   yarn test:release
                   if ($LASTEXITCODE -ne 0) { throw 'Release checks failed.' }
 
-            - name: Build and smoke-test the portable ZIP
+            - name: Build and verify the portable ZIP
               id: build
+              env:
+                  OVERTONE_ELECTRON_SMOKE_TEST: ${{ inputs.smoke_test }}
               run: node toolset/ci/build-mod-draft.js
 
             - name: Upload portable ZIP

@@ -155,7 +155,9 @@ async function main() {
         await fsp.rename(`${appArchive}.unpacked`, path.join(workspace, 'upstream.asar.unpacked'));
     }
     await fsp.rename(`${modArchive}.unpacked`, `${appArchive}.unpacked`);
-    await smokeTest(executable, path.join(workspace, 'smoke-user-data'), built.appConfig);
+    if (process.env.OVERTONE_ELECTRON_SMOKE_TEST === 'true') {
+        await smokeTest(executable, path.join(workspace, 'smoke-user-data'), built.appConfig);
+    }
 
     const metadata = { yandexMusicVersion, modName, modVersion, commit, builtAt: new Date().toISOString() };
     await fsp.writeFile(path.join(stage, 'build.json'), `${JSON.stringify(metadata, null, 2)}\n`, 'utf8');

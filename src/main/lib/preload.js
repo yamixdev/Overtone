@@ -49,6 +49,7 @@ const parseLyricsfile = (source) => {
 };
 const PULSESYNC_TITLEBAR_TEXT_CLASS = 'TitleBar_pulseText__FhYv';
 const PULSESYNC_TITLEBAR_GUARD_ATTRIBUTE = 'data-pulsesync-titlebar-branding-guard';
+const HIDE_OVERTONE_BRANDING_KEY = 'modSettings.window.hideOvertoneBranding';
 let cachedIsPremiumUser;
 const getIsPremiumUserSync = () => {
     if (cachedIsPremiumUser !== undefined) {
@@ -235,7 +236,9 @@ const cleanupNonPremiumTitlebarBranding = () => {
     }
 };
 const ensureNonPremiumTitlebarBranding = () => {
-    if (getIsPremiumUserSync()) {
+    const hideBranding = store_js_1.get(HIDE_OVERTONE_BRANDING_KEY) === true;
+    window.document.documentElement.toggleAttribute('data-overtone-hide-branding', hideBranding);
+    if (hideBranding || getIsPremiumUserSync()) {
         cleanupNonPremiumTitlebarBranding();
         return;
     }
@@ -358,6 +361,9 @@ const installNonPremiumTitlebarBrandingGuard = () => {
     electron_1.ipcRenderer.on(events_js_1.Events.PULSESYNC_PREMIUM_STATUS_CHANGED, (event, isPremium) => {
         cachedIsPremiumUser = Boolean(isPremium);
         scheduleGuard();
+    });
+    electron_1.ipcRenderer.on(events_js_1.Events.NATIVE_STORE_UPDATE, (_event, key) => {
+        if (key === HIDE_OVERTONE_BRANDING_KEY || key === 'modSettings.window' || key === 'modSettings') scheduleGuard();
     });
 
     if (!window.MutationObserver) return;

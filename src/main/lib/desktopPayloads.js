@@ -21,6 +21,19 @@ const isDesktopPlayerState = (value) => {
 const isDesktopTheme = (value) => {
     return value === 'light' || value === 'dark';
 };
+const isDiscordPlaybackProgress = (value) =>
+    isRecord(value) &&
+    !Array.isArray(value) &&
+    typeof value.trackId === 'string' &&
+    value.trackId.length > 0 &&
+    value.trackId.length <= 128 &&
+    Number.isFinite(value.position) &&
+    value.position >= 0 &&
+    Number.isFinite(value.duration) &&
+    value.duration >= 0 &&
+    Number.isSafeInteger(value.sampledAt) &&
+    value.sampledAt > 0 &&
+    value.sampledAt <= Date.now();
 const PLAYBACK_TIMING_KEYS = new Set(['entityHooksMs', 'mediaSourceMs', 'mediaHooksMs', 'preloadHooksMs', 'preparationWaitMs', 'canplayMs', 'playMs']);
 const isDesktopPlaybackDiagnostic = (value) => {
     if (!isRecord(value) || Array.isArray(value)) return false;
@@ -51,4 +64,4 @@ const isPngSavePayload = (value) => {
     );
 };
 
-module.exports = { isApplicationLanguage, isDesktopPlayerState, isDesktopTheme, isPngSavePayload, isDesktopPlaybackDiagnostic };
+module.exports = { isApplicationLanguage, isDesktopPlayerState, isDesktopTheme, isPngSavePayload, isDesktopPlaybackDiagnostic, isDiscordPlaybackProgress };

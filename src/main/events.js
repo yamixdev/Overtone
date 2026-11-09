@@ -88,6 +88,7 @@ let isApplicationInitFinished = false;
 let applicationInitFinishedAt = 0;
 let downloadQueue = Promise.resolve();
 let isGlobalShortcutsRecordingActive = false;
+exports.isRecordingGlobalShortcut = () => isGlobalShortcutsRecordingActive;
 let toastOperationNonce = 0;
 let isLastFmStartupAuthProbeHandled = false;
 let pendingLastFmStartupAuthErrorToast = false;
@@ -882,6 +883,10 @@ const handleApplicationEvents = (window) => {
     ipcRegistry.on(IpcChannel.APPLICATION_READY, async (event, language) => {
         eventsLogger.info('Event received', IpcChannel.APPLICATION_READY);
 
+        if (isGlobalShortcutsRecordingActive) {
+            isGlobalShortcutsRecordingActive = false;
+            updateGlobalShortcuts();
+        }
         isPlayerReady = false;
         validationNotificationsReady = false;
         validationErrorToastPending = pulseSyncManager.userValidationConnectionError;
@@ -1068,6 +1073,9 @@ const handleApplicationEvents = (window) => {
             timings: data.timings,
         });
     });
+    ipcRegistry.on(IpcChannel.DISCORD_PLAYBACK_PROGRESS, (_event, progress) => {
+        if (isPlayerReady) discordRichPresence_js_1.updatePlaybackProgress(progress);
+    });
     ipcRegistry.on(IpcChannel.PLAYER_STATE, (event, data) => {
         eventsLogger.info('Event received', IpcChannel.PLAYER_STATE, {
             status: data?.status,
@@ -1100,10 +1108,12 @@ const handleApplicationEvents = (window) => {
             MiniPlayer.updatePlayerState(structuredClone(data));
             (0, taskBarExtension_js_1.onPlayerStateChange)(window, data);
 
+            if (isPlayerReady && (isActiveState || data.status === 'buffering')) {
+                (0, discordRichPresence_js_1.discordRichPresence)(structuredClone(data));
+            }
             if (isPlayable) {
                 (0, scrobbleManager_js_1.handlePlayingStateEvent)(structuredClone(data));
                 (0, pulseSyncManager_js_1.updatePlayerState)(structuredClone(data));
-                (0, discordRichPresence_js_1.discordRichPresence)(structuredClone(data));
                 return;
             }
         } catch (e) {

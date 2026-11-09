@@ -3934,6 +3934,8 @@
                     canMoveForward: actions?.moveForward?.value,
                     track,
                     progress: state.playerState.progress.value,
+                    progressSampledAt: Date.now(),
+                    playbackRate: state.playerState.speed.value,
                     availableActions: {
                         moveBackward: actions?.moveBackward?.value,
                         moveForward: actions?.moveForward?.value,
@@ -14816,7 +14818,19 @@
                             (0, N.useEffect)(() => {
                                 // for PulseSync: BEGIN subscribe to player and queue changes for desktop state reporting
                                 if (!t) return;
-                                const report = () => reportPulseSyncPlayerState(t);
+                                let active = true;
+                                let reportScheduled = false;
+                                let lastReportAt = 0;
+                                const report = () => {
+                                    if (reportScheduled) return;
+                                    reportScheduled = true;
+                                    queueMicrotask(() => {
+                                        reportScheduled = false;
+                                        if (!active) return;
+                                        lastReportAt = performance.now();
+                                        reportPulseSyncPlayerState(t);
+                                    });
+                                };
                                 const cleanups = [];
                                 let actionCleanups = [];
                                 const subscribe = (observable, listener = report, disposers = cleanups) => {
@@ -14832,6 +14846,7 @@
                                 };
                                 for (const observable of [
                                     t.state.playerState.status,
+                                    t.state.playerState.speed,
                                     t.state.playerState.exponentVolume,
                                     t.state.queueState.currentEntity,
                                     t.state.queueState.entityList,
@@ -14841,9 +14856,19 @@
                                     t.state.queueState.shuffle,
                                 ])
                                     subscribe(observable);
+                                subscribe(t.state.playerState.progress, () => {
+                                    const now = performance.now();
+                                    if (!active || reportScheduled || t.state.playerState.status.value !== 'playing' || now - lastReportAt < 5000) return;
+                                    if (window.nativeSettings?.get?.('modSettings.discordRPC.enable') === false) return;
+                                    const trackId = t.state.queueState.currentEntity.value?.entity?.data?.meta?.id;
+                                    if (trackId == null) return;
+                                    const { position, duration } = t.state.playerState.progress.value;
+                                    lastReportAt = now;
+                                    window.musicDesktop?.player.reportDiscordProgress?.({ trackId: String(trackId), position, duration, sampledAt: Date.now() });
+                                });
                                 subscribe(t.state.playerState.event, () => {
                                     const event = t.state.playerState.event.value;
-                                    if (event === 'SET_PROGRESS' || event === L.Iu?.SET_PROGRESS) report();
+                                    if (event === 'Seeked' || event === 'SET_PROGRESS' || event === L.Iu?.SET_PROGRESS) report();
                                 });
                                 // for PulseSync: END subscribe to player and queue changes for desktop state reporting
                                 // for PulseSync WebHost: BEGIN handle desktop current-track requests and expose the player instance to addons
@@ -14856,6 +14881,7 @@
                                 // for PulseSync WebHost: END handle desktop current-track requests and expose the player instance to addons
                                 return () => {
                                     // for PulseSync WebHost: BEGIN clean up desktop state subscriptions and the exposed addon player instance
+                                    active = false;
                                     cleanups.forEach((cleanup) => cleanup());
                                     actionCleanups.forEach((cleanup) => cleanup());
                                     if (window.__pulseSyncPendingPlayerInstance === t) delete window.__pulseSyncPendingPlayerInstance;

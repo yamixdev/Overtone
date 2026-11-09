@@ -31,6 +31,7 @@ let isApplyingEvenCorrection = false;
 
 const updateWindowDimensions = (window) => {
     const applyCorrection = () => {
+        if (window.isDestroyed() || window.isFullScreen()) return;
         const [w, h] = window.getSize();
         const evenW = w & ~1;
         const evenH = h & ~1;
@@ -151,6 +152,7 @@ const handleWindowLifecycleEvents = (window) => {
         updateWindowDimensions(window);
     });
     window.on('moved', () => {
+        if (window.isFullScreen()) return;
         const position = window.getPosition();
         store_js_1.setWindowPosition(position[0], position[1]);
     });
@@ -185,6 +187,20 @@ const handleWindowLifecycleEvents = (window) => {
         }
     });
     webContents.on('before-input-event', (event, input) => {
+        if (
+            input.type === 'keyDown' &&
+            input.key === 'F11' &&
+            !input.alt &&
+            !input.control &&
+            !input.meta &&
+            !input.shift &&
+            !events_js_1.isRecordingGlobalShortcut() &&
+            window.isFullScreenable()
+        ) {
+            event.preventDefault();
+            if (!input.isAutoRepeat) window.setFullScreen(!window.isFullScreen());
+            return;
+        }
         if (input.control && input.shift && input.code === 'KeyI' && input.type === 'keyDown' && webContents.getLastWebPreferences().devTools !== false) {
             event.preventDefault();
             webContents.toggleDevTools();
@@ -200,7 +216,10 @@ const handleWindowLifecycleEvents = (window) => {
             `);
         webContents.insertCSS(
             `
-                html[data-pulsesync-titlebar-branding-guard="true"] [data-pulsesync-titlebar-branding="true"] {
+                html[data-overtone-hide-branding] [class*="TitleBar_pulseText"] {
+                    display: none !important;
+                }
+                html[data-pulsesync-titlebar-branding-guard="true"]:not([data-overtone-hide-branding]) [data-pulsesync-titlebar-branding="true"] {
                     display: inline !important;
                     visibility: visible !important;
                     opacity: 1 !important;

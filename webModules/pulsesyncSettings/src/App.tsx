@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { PulseSyncAddonApi } from '../../pulsesyncWebHost/src/contracts';
 import styles from './App.module.scss';
 import { getModSettingsApi } from './api/modSettings';
@@ -6,6 +6,7 @@ import { PULSESYNC_OPEN_SETTINGS_EVENT } from './events';
 import { useModSetting } from './hooks/useModSetting';
 import { useModalPresence } from './hooks/useModalPresence';
 import { SETTINGS_GROUPS, SETTINGS_SECTIONS, type SettingsSectionId } from './schema/registry';
+import { MOD_SETTINGS_SCALE_KEY, MOD_SETTINGS_SCALE_MAX, MOD_SETTINGS_SCALE_MIN } from './schema/sections/interface';
 import { SettingsNavigationProvider } from './SettingsNavigationProvider';
 
 type AppProps = {
@@ -72,6 +73,8 @@ function App({ api }: AppProps = {}) {
     const modSettingsApi = getModSettingsApi(api);
     const [displayMaxFps, setDisplayMaxFps] = useState(60);
     const { close, isMounted, isVisible, open } = useModalPresence(import.meta.env.DEV);
+    const { value: modSettingsScale } = useModSetting(modSettingsApi, MOD_SETTINGS_SCALE_KEY, 100);
+    const settingsScale = Math.min(MOD_SETTINGS_SCALE_MAX, Math.max(MOD_SETTINGS_SCALE_MIN, modSettingsScale)) / 100;
     const { value: swapVibeAnimationAndWheel } = useModSetting(
         modSettingsApi,
         SWAP_VIBE_ANIMATION_AND_WHEEL_KEY,
@@ -142,19 +145,9 @@ function App({ api }: AppProps = {}) {
             return;
         }
 
-        const frame = window.requestAnimationFrame(() => {
-            const target = Array.from(
-                contentRef.current?.querySelectorAll<HTMLElement>('[data-pulsesync-setting-id]') ?? [],
-            ).find((item) => item.dataset.pulsesyncSettingId === highlightedSettingId);
-
-            target?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        });
         const timeout = window.setTimeout(() => setHighlightedSettingId(undefined), 3600);
 
-        return () => {
-            window.cancelAnimationFrame(frame);
-            window.clearTimeout(timeout);
-        };
+        return () => window.clearTimeout(timeout);
     }, [activeSection, highlightedSettingId, isVisible]);
 
     useEffect(() => {
@@ -216,6 +209,8 @@ function App({ api }: AppProps = {}) {
         >
             <section
                 className={`${styles.modal}${shouldOffsetModal ? ` ${swapVibeAnimationAndWheel ? styles.withRightOffset : styles.withLeftOffset}` : ''}`}
+                style={{ '--settings-scale': settingsScale } as CSSProperties}
+                data-restart-notice={showRestartNotice}
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="PulseSyncSettings_title"

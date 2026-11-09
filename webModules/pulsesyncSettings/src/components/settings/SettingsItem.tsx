@@ -1,4 +1,4 @@
-import { cloneElement, useEffect, useState, type ReactElement, type ReactNode } from 'react';
+import { cloneElement, useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import { createModSettingsDeeplink, matchesSettingsSearch, useSettingsNavigation } from '../../settingsNavigation';
 import styles from './SettingsItem.module.scss';
 
@@ -39,8 +39,21 @@ async function copyText(value: string) {
 export function SettingsItem({ children, id, searchText }: SettingsItemProps) {
     const { categoryId, categoryLabel, highlightedSettingId, searchQuery } = useSettingsNavigation();
     const [copyState, setCopyState] = useState<'copied' | 'error' | 'idle'>('idle');
+    const elementRef = useRef<HTMLDivElement>(null);
     const visible = matchesSettingsSearch(searchQuery, [categoryId, categoryLabel, id, ...searchText]);
     const highlighted = highlightedSettingId === id;
+
+    useEffect(() => {
+        if (!highlighted || !visible) {
+            return;
+        }
+
+        const frame = window.requestAnimationFrame(() =>
+            elementRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' }),
+        );
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [highlighted, visible]);
 
     useEffect(() => {
         if (copyState === 'idle') {
@@ -90,7 +103,7 @@ export function SettingsItem({ children, id, searchText }: SettingsItemProps) {
     );
 
     return (
-        <div className={styles.item} data-highlighted={highlighted} data-pulsesync-setting-id={id}>
+        <div ref={elementRef} className={styles.item} data-highlighted={highlighted} data-pulsesync-setting-id={id}>
             {cloneElement(children, { titleAction: copyButton })}
         </div>
     );

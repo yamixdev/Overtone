@@ -8,7 +8,7 @@ import { SchemaSettingsSection } from './SchemaSettingsSection';
 import { appSectionsSchema, appUpdatesSchema, downloaderSchema, playlistSchema } from './sections/general';
 import { crossfadeSchema } from './sections/crossfade';
 import { discordRpcSchema, lrclibSchema } from './sections/integrations';
-import { miniplayerSchema, playerBarSchema, windowSchema } from './sections/interface';
+import { miniplayerSchema, modAppearanceSchema, playerBarSchema, windowSchema } from './sections/interface';
 import { systemSchema, ynisonSchema } from './sections/system';
 import { vibeAppearanceSchema, vibeBehaviorSchema, vibePerformanceSchema } from './sections/vibe';
 import type { SettingsSectionSchema } from './types';
@@ -62,6 +62,7 @@ export const SETTINGS_GROUPS = [
     {
         label: 'Интерфейс',
         sections: [
+            schemaSection('mod-appearance', 'Внешний вид мода', modAppearanceSchema),
             schemaSection('window', 'Окно', windowSchema),
             schemaSection('player', 'Плеер', playerBarSchema),
             schemaSection('miniplayer', 'Миниплеер', miniplayerSchema),

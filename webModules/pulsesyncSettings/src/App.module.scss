@@ -75,15 +75,21 @@
 }
 
 .restartNotice {
+    display: none;
+
     &[data-visible='true'] {
+        position: absolute;
+        z-index: 1;
+        inset-inline: 0;
+        inset-block-end: 12px;
         display: flex;
         flex-wrap: wrap;
         align-items: center;
         justify-content: center;
-        align-self: center;
         gap: 4px 12px;
+        inline-size: max-content;
         max-inline-size: calc(100% - 24px);
-        margin-block-end: 12px;
+        margin-inline: auto;
         padding: 4px 8px 4px 12px;
         border-radius: 16px;
         box-sizing: border-box;
@@ -134,12 +140,15 @@
 
 .modal {
     --modal-offset-x: 0px;
+    --modal-width: calc((100vw - 2 * var(--modal-viewport-inset)) / var(--settings-scale));
+    --modal-height: calc((100dvh - 2 * var(--modal-viewport-inset)) / var(--settings-scale));
 
+    position: relative;
+    zoom: var(--settings-scale);
     display: flex;
     flex-direction: column;
-    width: min(920px, 100%);
-    height: min(760px, calc(100vh - 48px));
-    max-height: min(760px, calc(100vh - 48px));
+    width: min(920px, var(--modal-width));
+    height: min(760px, var(--modal-height));
     overflow: hidden;
     color: var(--ym-controls-color-primary-text-enabled_variant);
     background: var(--settings-surface);
@@ -164,17 +173,21 @@
     }
 }
 
+.modal[data-restart-notice='true'] :is(.navigation, .content) {
+    padding-block-end: 104px;
+}
+
 .withLeftOffset {
-    --modal-offset-x: clamp(calc(-50vw + 50% + var(--modal-viewport-inset)), -60%, 0px);
+    --modal-offset-x: clamp(calc(50% - var(--modal-width) / 2), -60%, 0px);
 }
 
 .withRightOffset {
-    --modal-offset-x: clamp(0px, 60%, calc(50vw - 50% - var(--modal-viewport-inset)));
+    --modal-offset-x: clamp(0px, 60%, calc(var(--modal-width) / 2 - 50%));
 }
 
 .body {
     display: grid;
-    grid-template-columns: 290px minmax(0, 1fr);
+    grid-template-columns: clamp(120px, 32%, 290px) minmax(0, 1fr);
     flex: 1 1 auto;
     min-height: 0;
     border-top: 1px solid var(--ym-controls-color-secondary-outline-default-stroke, rgba(255, 255, 255, 0.08));
@@ -452,13 +465,12 @@
     }
 
     .modal {
-        height: calc(100vh - 24px);
-        max-height: calc(100vh - 24px);
+        height: var(--modal-height);
         border-radius: 20px;
     }
 
     .body {
-        grid-template-columns: 160px minmax(0, 1fr);
+        grid-template-columns: clamp(100px, 33%, 160px) minmax(0, 1fr);
     }
 
     .navigation {

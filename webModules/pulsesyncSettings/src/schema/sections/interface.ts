@@ -1,6 +1,11 @@
 import { defineSettingsSection } from '../types';
 
 const WINDOW_PREFIX = 'modSettings.window.';
+
+export const MOD_SETTINGS_SCALE_KEY = `${WINDOW_PREFIX}modSettingsScale`;
+export const MOD_SETTINGS_SCALE_MIN = 85;
+export const MOD_SETTINGS_SCALE_MAX = 115;
+
 const SHOW_NON_MUSIC_PAGE_KEY = 'modSettings.showNonMusicPage';
 const SHOW_CONCERTS_TAB_KEY = 'modSettings.showConcertsTab';
 const PLAYER_PREFIX = 'modSettings.playerBarEnhancement.';
@@ -9,6 +14,30 @@ const ENABLE_CAST_KEY = `${PLAYER_PREFIX}enableYandexStationCast`;
 const refreshPlayerBar = (_value: unknown, context: { api?: { refreshPlayerBar: () => void } }) => {
     context.api?.refreshPlayerBar();
 };
+
+export const modAppearanceSchema = defineSettingsSection({
+    title: 'Внешний вид мода',
+    items: [
+        {
+            type: 'slider',
+            key: MOD_SETTINGS_SCALE_KEY,
+            defaultValue: 100,
+            title: 'Масштаб настроек мода',
+            description: 'Меняет размер окна настроек, текста и элементов управления в нём.',
+            min: MOD_SETTINGS_SCALE_MIN,
+            max: MOD_SETTINGS_SCALE_MAX,
+            step: 5,
+            valueLabel: (value) => `${value}%`,
+        },
+        {
+            type: 'toggle',
+            key: `${WINDOW_PREFIX}hideOvertoneBranding`,
+            defaultValue: false,
+            title: 'Скрывать название и версию Overtone',
+            description: 'Убирает подпись Overtone из верхней панели окна.',
+        },
+    ],
+});
 
 export const windowSchema = defineSettingsSection({
     title: 'Поведение окна',

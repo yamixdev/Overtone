@@ -6,6 +6,7 @@ import type {
     LocalAddonSettingValue,
 } from '../../../../shared/musicDesktop';
 import { SettingsSection, type SettingsSchemaItem } from '../../components/settings/SettingsSection';
+import { getSettingsItemSearchText, matchesSettingsSearch, useSettingsNavigation } from '../../settingsNavigation';
 
 const getErrorMessage = (error: unknown) =>
     error instanceof Error
@@ -61,12 +62,30 @@ function settingItem(
 }
 
 export function LocalAddonsSettings() {
+    const { highlightedSettingId, searchQuery } = useSettingsNavigation();
     const bridge = window.musicDesktop?.pulsesync.addons;
     const manageLocal = bridge?.manageLocal;
     const [addons, setAddons] = useState<LocalAddon[]>();
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string>();
+    const [expandedAddon, setExpandedAddon] = useState<string>();
     const [expandedSettings, setExpandedSettings] = useState<string>();
+    const linkedAddonId = addons?.find(({ id }) => highlightedSettingId?.startsWith(`${id}-`))?.id;
+
+    useEffect(() => {
+        if (!linkedAddonId) {
+            return;
+        }
+
+        const frame = window.requestAnimationFrame(() => {
+            setExpandedAddon(linkedAddonId);
+            setExpandedSettings(
+                highlightedSettingId?.startsWith(`${linkedAddonId}-setting-`) ? linkedAddonId : undefined,
+            );
+        });
+
+        return () => window.cancelAnimationFrame(frame);
+    }, [highlightedSettingId, linkedAddonId]);
 
     useEffect(() => {
         if (!bridge || !manageLocal || busy) {
@@ -177,14 +196,24 @@ export function LocalAddonsSettings() {
     }
 
     for (const { id, name, type, version, enabled, quarantined, allowedUrls, settings } of addons ?? []) {
+        const addonItems: SettingsSchemaItem[] = [];
+        const expanded = expandedAddon === id;
+
         items.push({
             id,
-            type: 'toggle',
+            type: 'disclosure',
+            expanded,
+            items: addonItems,
+            onToggle: (open) => {
+                setExpandedAddon(open ? id : undefined);
+                setExpandedSettings(undefined);
+            },
             props: {
                 title: name,
                 description: [
                     type === 'theme' ? 'CSS-тема' : 'WebHost-аддон',
                     version,
+                    allowedUrls?.length ? 'Доступ к сети' : '',
                     quarantined ? 'Остановлен после ошибки загрузки' : '',
                 ]
                     .filter(Boolean)
@@ -199,7 +228,7 @@ export function LocalAddonsSettings() {
         if (allowedUrls?.length) {
             const hosts = [...new Set(allowedUrls.map((value) => new URL(value).host))];
 
-            items.push({
+            addonItems.push({
                 id: `${id}-network`,
                 type: 'note',
                 text: `При включении аддон сможет обращаться к ${hosts.join(', ')}.`,
@@ -207,33 +236,39 @@ export function LocalAddonsSettings() {
         }
 
         if (settings?.length) {
-            const expanded = expandedSettings === id;
+            const fields = settings.map((setting) =>
+                settingItem(
+                    `${id}-setting-${setting.id}`,
+                    setting,
+                    busy,
+                    (value) => void setSetting(id, setting.id, value),
+                ),
+            );
+            const settingsVisible =
+                expandedSettings === id ||
+                fields.some(
+                    (field) =>
+                        field.id === highlightedSettingId ||
+                        (Boolean(searchQuery.trim()) &&
+                            matchesSettingsSearch(searchQuery, getSettingsItemSearchText(field))),
+                );
 
-            items.push({
+            addonItems.push({
                 id: `${id}-settings`,
                 type: 'action',
                 props: {
-                    title: `${expanded ? 'Скрыть настройки' : 'Настроить'} «${name}»`,
+                    title: settingsVisible ? 'Скрыть настройки' : 'Настроить',
                     disabled: busy,
-                    onClick: () => setExpandedSettings(expanded ? undefined : id),
+                    onClick: () => setExpandedSettings(settingsVisible ? undefined : id),
                 },
             });
 
-            if (expanded) {
-                for (const setting of settings) {
-                    items.push(
-                        settingItem(
-                            `${id}-setting-${setting.id}`,
-                            setting,
-                            busy,
-                            (value) => void setSetting(id, setting.id, value),
-                        ),
-                    );
-                }
+            if (settingsVisible) {
+                addonItems.push(...fields);
             }
         }
 
-        items.push({
+        addonItems.push({
             id: `${id}-remove`,
             type: 'action',
             props: { title: `Удалить «${name}»`, disabled: busy, onClick: () => void run({ action: 'remove', id }) },

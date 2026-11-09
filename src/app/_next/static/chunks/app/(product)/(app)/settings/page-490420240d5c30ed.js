@@ -1519,7 +1519,13 @@
                             size: 'xs',
                             children: [
                                 'На основе наработок команды ',
-                                (0, o.jsx)(I.N, { target: '_blank', href: 'https://github.com/PulseSync-LLC/PulseSync-mod', children: 'PulseSync' }, 'upstream'),
+                                (0, o.jsx)(I.N, {
+                                    className: k().link,
+                                    style: { textDecoration: 'underline', textUnderlineOffset: '0.15em' },
+                                    target: '_blank',
+                                    href: 'https://github.com/PulseSync-LLC/PulseSync-mod',
+                                    children: 'PulseSync',
+                                }, 'upstream'),
                             ],
                         }),
                         // for PulseSync: END credit the upstream team in native settings

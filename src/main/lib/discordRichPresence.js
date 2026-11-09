@@ -17,7 +17,7 @@ class convertableLink {
 
     toWeb() {
         if (!this.link) return;
-        return 'https://music.yandex.ru/' + this.link + '?utm_source=discord&utm_medium=rich_presence_click';
+        return 'https://music.yandex.ru/' + this.link;
     }
 
     toApp() {
@@ -49,6 +49,7 @@ let pausedState = null;
 let afkDeadline = null;
 
 let lastPlayingState = undefined;
+let lastPlayingStateIsRemote = false;
 let lastActivity = undefined;
 
 let activityRevision = 0;
@@ -170,6 +171,7 @@ const states = {
     playing: { icon: 'playing', name: 'Playing' },
     paused: { icon: 'paused', name: 'Paused' },
     stopped: { icon: 'paused', name: 'Stopped' },
+    buffering: { icon: 'paused', name: 'Buffering' },
     unknown: { icon: 'logo', name: 'Unknown' },
     default: { icon: 'logo', name: 'Yandex Music' },
 };
@@ -200,15 +202,9 @@ function serializeActivity(activity) {
 // Проверка значительно ли отличаются временные метки.
 // Нужно для оценки целесообразности отправки нового SET_ACTIVITY.
 function isTimestampsDifferent(activityA, activityB) {
-    const diff = Math.abs((activityA.startTimestamp ?? 0) - (activityB.startTimestamp ?? 0)) + Math.abs((activityA.endTimestamp ?? 0) - (activityB.endTimestamp ?? 0));
-
-    discordRichPresenceLogger.info(
-        diff,
-        (activityA.startTimestamp ?? 0) - (activityB.startTimestamp ?? 0),
-        (activityA.endTimestamp ?? 0) - (activityB.endTimestamp ?? 0),
+    return ['startTimestamp', 'endTimestamp'].some(
+        (key) => (activityA[key] === undefined) !== (activityB[key] === undefined) || Math.abs((activityA[key] ?? 0) - (activityB[key] ?? 0)) >= 750,
     );
-
-    return diff > 2000;
 }
 
 function compareActivities(newActivity) {
@@ -238,7 +234,8 @@ const fromYnisonState = (ynisonState) => {
 
     let partialPlayerState = {};
 
-    let currentTrackData = ynisonState?.rawData?.player_state?.player_queue?.playable_list[ynisonState?.rawData?.player_state?.player_queue?.current_playable_index];
+    const queue = ynisonState?.rawData?.player_state?.player_queue;
+    const currentTrackData = queue?.playable_list?.[queue.current_playable_index];
 
     if (!currentTrackData) return;
 
@@ -278,13 +275,15 @@ const fromYnisonState = (ynisonState) => {
 
     partialPlayerState.currentDevice = currentDevice;
 
-    if (!Number.isNaN(progressMs)) {
+    if (Number.isFinite(progressMs)) {
         partialPlayerState.progress = {
-            position: Math.round(progressMs / 1000),
+            position: progressMs / 1000,
         };
     }
+    partialPlayerState.playbackRate = Number(ynisonStatus.playback_speed);
+    partialPlayerState.progressSampledAt = Number(ynisonStatus.version?.timestamp_ms);
 
-    discordRichPresence(partialPlayerState);
+    discordRichPresence(partialPlayerState, { remote: true });
 };
 
 function enqueueActivityOperation(operationName, operation) {
@@ -433,6 +432,24 @@ function sendCurrentActivity() {
     }
 }
 
+function getPlaybackTimestamps(playingState, isGenerative) {
+    const position = playingState.progress?.position;
+    if (playingState.status !== 'playing' || !Number.isFinite(position)) return {};
+
+    const duration = playingState.progress?.duration;
+    const durationMs = Number.isFinite(duration) && duration > 0 ? duration * 1000 : Number(playingState.track.durationMs);
+    const hasDuration = Number.isFinite(durationMs) && durationMs > 0;
+    const rate = playingState.playbackRate;
+    const speed = Number.isFinite(rate) && rate > 0 ? rate : 1;
+    const now = Date.now();
+    const sampledAt = playingState.progressSampledAt;
+    const anchor = Number.isFinite(sampledAt) && sampledAt > 0 && sampledAt <= now ? sampledAt : now;
+    const positionMs = Math.max(0, hasDuration ? Math.min(position * 1000, durationMs) : position * 1000);
+    const startTimestamp = Math.round(anchor - positionMs / speed);
+    const endTimestamp = !isGenerative && hasDuration ? Math.round(anchor + (durationMs - positionMs) / speed) : undefined;
+    return { startTimestamp, endTimestamp };
+}
+
 function buildActivityObject(playingState, rpcSettings) {
     if (!playingState.track) return undefined;
 
@@ -440,7 +457,7 @@ function buildActivityObject(playingState, rpcSettings) {
         return undefined;
     }
 
-    const isGenerative = playingState.track?.id.startsWith('generative');
+    const isGenerative = String(playingState.track.id ?? '').startsWith('generative');
 
     let title = playingState.track?.title;
 
@@ -474,10 +491,6 @@ function buildActivityObject(playingState, rpcSettings) {
 
     const shareArtistPath = new convertableLink(playingState.track.artists?.[0]?.id ? `artist/${playingState.track.artists?.[0]?.id}` : undefined);
 
-    let startTimestamp = Math.round(Date.now() - (playingState.progress.position ?? 0) * 1000);
-
-    let endTimestamp = isGenerative ? undefined : startTimestamp + (playingState.track.durationMs ?? 0);
-
     let stateKey = states[playingState.status]?.icon;
 
     let stateText = states[playingState.status]?.name;
@@ -489,11 +502,6 @@ function buildActivityObject(playingState, rpcSettings) {
         stateText = states.unknown?.name;
     }
 
-    if (playingState.status !== 'playing') {
-        startTimestamp = undefined;
-        endTimestamp = undefined;
-    }
-
     let activityObject = {
         type: 2,
         statusDisplayType: STATUS_DISPLAY_TYPES[rpcSettings.statusDisplayType] ?? 0,
@@ -502,8 +510,7 @@ function buildActivityObject(playingState, rpcSettings) {
         state: string2Discord(artist),
         stateUrl: shareArtistPath.toWeb(),
         largeImageKey: albumArt,
-        startTimestamp,
-        endTimestamp,
+        ...getPlaybackTimestamps(playingState, isGenerative),
         instance: false,
     };
 
@@ -543,12 +550,28 @@ function buildActivityObject(playingState, rpcSettings) {
     return activityObject;
 }
 
-const discordRichPresence = (playingState) => {
-    lastPlayingState = playingState;
+const discordRichPresence = (playingState, { remote = false } = {}) => {
+    lastPlayingStateIsRemote = remote;
+    lastPlayingState = { ...playingState, progressSampledAt: playingState.progressSampledAt || Date.now() };
     sendCurrentActivity();
 };
 
+function updatePlaybackProgress({ trackId, position, duration, sampledAt }) {
+    if (
+        settings().enable === false ||
+        lastPlayingStateIsRemote ||
+        lastPlayingState?.status !== 'playing' ||
+        String(lastPlayingState.track?.id ?? '') !== trackId ||
+        sampledAt <= lastPlayingState.progressSampledAt
+    )
+        return;
+    lastPlayingState.progress = { position, duration };
+    lastPlayingState.progressSampledAt = sampledAt;
+    sendCurrentActivity();
+}
+
 exports.discordRichPresence = discordRichPresence;
+exports.updatePlaybackProgress = updatePlaybackProgress;
 
 exports.fromYnisonState = fromYnisonState;
 exports.refreshSettings = sendCurrentActivity;

@@ -17,6 +17,7 @@ var IpcChannel = ((IpcChannel2) => {
     IpcChannel2['PROBABILITY_BUCKET'] = 'desktop:application:probability-bucket';
     IpcChannel2['LOAD_RELEASE_NOTES'] = 'desktop:application:load-release-notes';
     IpcChannel2['PLAYER_STATE'] = 'desktop:player:state';
+    IpcChannel2['DISCORD_PLAYBACK_PROGRESS'] = 'desktop:player:discord-progress';
     IpcChannel2['PLAYER_DIAGNOSTIC'] = 'desktop:player:diagnostic';
     IpcChannel2['PLAYER_ACTION'] = 'desktop:player:action';
     IpcChannel2['OPEN_DEEPLINK'] = 'desktop:navigation:open-deeplink';

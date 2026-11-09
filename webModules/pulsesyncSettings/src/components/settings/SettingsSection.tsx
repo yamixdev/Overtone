@@ -1,15 +1,23 @@
-import type { ComponentProps } from 'react';
+import { useState, type ComponentProps, type ReactNode } from 'react';
 import { SettingAction } from '../controls/SettingAction';
 import { SettingInput } from '../controls/SettingInput';
 import { SettingPath } from '../controls/SettingPath';
 import { SettingSelect } from '../controls/SettingSelect';
 import { SettingSlider } from '../controls/SettingSlider';
 import { SettingToggle } from '../controls/SettingToggle';
-import { matchesSettingsSearch, useSettingsNavigation } from '../../settingsNavigation';
+import { getSettingsItemSearchText, matchesSettingsSearch, SettingsNavigationContext, useSettingsNavigation } from '../../settingsNavigation';
 import { SettingsItem } from './SettingsItem';
 import styles from './SettingsSection.module.scss';
 
 export type SettingsSchemaItem =
+    | {
+          id: string;
+          type: 'disclosure';
+          props: ComponentProps<typeof SettingToggle>;
+          expanded: boolean;
+          onToggle: (expanded: boolean) => void;
+          items: readonly SettingsSchemaItem[];
+      }
     | {
           id: string;
           type: 'action';
@@ -59,6 +67,16 @@ type SettingsSectionProps = {
 
 function renderItem(item: SettingsSchemaItem) {
     switch (item.type) {
+        case 'disclosure': {
+            const contentId = `settings-disclosure-${item.id}`;
+
+            return (
+                <SettingsItem id={item.id} key={item.id} searchText={getSettingsItemSearchText(item)}>
+                    <SettingsDisclosure item={item} contentId={contentId} />
+                </SettingsItem>
+            );
+        }
+
         case 'action':
             return (
                 <SettingsItem id={item.id} key={item.id} searchText={[item.props.title, item.props.description]}>
@@ -124,6 +142,63 @@ function renderItem(item: SettingsSchemaItem) {
                 </SettingsItem>
             );
     }
+}
+
+function SettingsDisclosure({
+    item,
+    contentId,
+    titleAction,
+}: {
+    item: Extract<SettingsSchemaItem, { type: 'disclosure' }>;
+    contentId: string;
+    titleAction?: ReactNode;
+}) {
+    const navigation = useSettingsNavigation();
+    const [dismissedExpansion, setDismissedExpansion] = useState<string>();
+    const { searchQuery, highlightedSettingId } = navigation;
+    const parentMatches = matchesSettingsSearch(searchQuery, [item.id, item.props.title, item.props.description]);
+    const hasMatchingChild =
+        Boolean(searchQuery.trim()) &&
+        !parentMatches &&
+        item.items.some((child) => matchesSettingsSearch(searchQuery, getSettingsItemSearchText(child)));
+    const hasHighlightedChild = item.items.some((child) => child.id === highlightedSettingId);
+    const autoExpansion = hasHighlightedChild ? highlightedSettingId : hasMatchingChild ? searchQuery : undefined;
+    const expanded = item.expanded || (autoExpansion !== undefined && autoExpansion !== dismissedExpansion);
+
+    return (
+        <div className={styles.disclosure} data-expanded={expanded}>
+            <SettingToggle
+                {...item.props}
+                titleAction={titleAction}
+                endAction={
+                    <button
+                        className={styles.disclosureButton}
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-controls={contentId}
+                        aria-label={`Действия для «${item.props.title}»`}
+                        onClick={() => {
+                            setDismissedExpansion(expanded ? autoExpansion : undefined);
+                            item.onToggle(!expanded);
+                        }}
+                    >
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="m7 10 5 5 5-5" />
+                        </svg>
+                    </button>
+                }
+            />
+            <div id={contentId} hidden={!expanded} className={styles.disclosureBody}>
+                {expanded && (
+                    <SettingsNavigationContext.Provider
+                        value={parentMatches ? { ...navigation, searchQuery: '' } : navigation}
+                    >
+                        {item.items.map(renderItem)}
+                    </SettingsNavigationContext.Provider>
+                )}
+            </div>
+        </div>
+    );
 }
 
 export function SettingsSection({ error, items, title }: SettingsSectionProps) {

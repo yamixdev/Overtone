@@ -1380,6 +1380,10 @@
                             // for PulseSync: BEGIN ignore stale media end hooks after playback request changes
                             end: () => {
                                 const requestId = this.playRequestId;
+                                if (
+                                    this.state.status.value === o.LOADING_MEDIA_SOURCE ||
+                                    (this.pendingMediaStartRequestId != null && this.pendingMediaStartRequestId === requestId)
+                                ) return;
                                 this.hooks.afterMediaEndPlaying
                                     .promise()
                                     .catch((error) => {
@@ -1520,6 +1524,14 @@
                     const { entity, positionSec, source, diagnostic } = e;
                     this.cancelPendingPlay();
                     const requestId = this.playRequestId;
+                    this.pendingMediaStartRequestId = requestId;
+                    try {
+                        await this.startMediaSource({ entity, positionSec, source, diagnostic }, requestId);
+                    } finally {
+                        if (this.pendingMediaStartRequestId === requestId) this.pendingMediaStartRequestId = null;
+                    }
+                }
+                async startMediaSource({ entity, positionSec, source, diagnostic }, requestId) {
                     const sourceStarted = performance.now();
                     let mediaSource;
                     try {
@@ -2065,14 +2077,29 @@
                     const requestId = this.gaplessPlayId;
                     const diagnostic = e.diagnostic;
                     let prepared = null;
+                    // for PulseSync: BEGIN reuse ready standby audio without blocking manual track changes
                     if (this.isGaplessEnabled() && !t.isPulseSyncReplacement) {
-                        this.pendingGaplessPlay = e;
-                        this.currentMediaPlayer.offEnd();
-                        const started = performance.now();
-                        prepared = await this.preparePlayback(t);
-                        if (diagnostic) diagnostic.timings.preparationWaitMs = performance.now() - started;
-                        if (requestId !== this.gaplessPlayId) return;
+                        if (t.lastChangeMethod === a.AUTO_MOVE_FORWARD) {
+                            this.pendingGaplessPlay = e;
+                            this.currentMediaPlayer.offEnd();
+                            const started = performance.now();
+                            prepared = await this.preparePlayback(t);
+                            if (diagnostic) diagnostic.timings.preparationWaitMs = performance.now() - started;
+                            if (requestId !== this.gaplessPlayId) return;
+                        } else {
+                            const standby = this.preparedPlayback;
+                            if (
+                                standby?.ready &&
+                                standby.pair.entity === t.entity &&
+                                standby.positionSec === t.positionSec &&
+                                standby.source === t.entity.mediaSourceData &&
+                                !standby.controller.signal.aborted
+                            ) {
+                                prepared = standby;
+                            }
+                        }
                     }
+                    // for PulseSync: END reuse ready standby audio without blocking manual track changes
                     if (prepared && this.isGaplessEnabled() && prepared.player !== this.currentMediaPlayer) {
                         const previous = this.currentMediaPlayer;
                         this.preparedPlayback = null;

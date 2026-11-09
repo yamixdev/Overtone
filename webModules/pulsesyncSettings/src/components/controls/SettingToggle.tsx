@@ -10,6 +10,7 @@ type SettingToggleProps = {
     onChange: (checked: boolean) => void;
     title: string;
     titleAction?: ReactNode;
+    endAction?: ReactNode;
 };
 
 export function SettingToggle({
@@ -20,6 +21,7 @@ export function SettingToggle({
     onChange,
     title,
     titleAction,
+    endAction,
 }: SettingToggleProps) {
     return (
         <div className={styles.row} data-disabled={disabled}>
@@ -31,17 +33,20 @@ export function SettingToggle({
                 </div>
                 {description ? <div className={styles.description}>{description}</div> : null}
             </div>
-            <button
-                className={styles.switch}
-                type="button"
-                role="switch"
-                aria-checked={checked}
-                aria-label={title}
-                disabled={disabled}
-                onClick={() => onChange(!checked)}
-            >
-                <span />
-            </button>
+            <div className={styles.actions}>
+                {endAction}
+                <button
+                    className={styles.switch}
+                    type="button"
+                    role="switch"
+                    aria-checked={checked}
+                    aria-label={title}
+                    disabled={disabled}
+                    onClick={() => onChange(!checked)}
+                >
+                    <span />
+                </button>
+            </div>
         </div>
     );
 }

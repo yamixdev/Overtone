@@ -59,6 +59,7 @@ const createMusicDesktopBridge = (runtime) => ({
     },
     player: {
         reportState: (state) => electron.ipcRenderer.send(IpcChannel.PLAYER_STATE, state),
+        reportDiscordProgress: (progress) => electron.ipcRenderer.send(IpcChannel.DISCORD_PLAYBACK_PROGRESS, progress),
         reportDiagnostic: (payload) => electron.ipcRenderer.send(IpcChannel.PLAYER_DIAGNOSTIC, payload),
         onAction: (listener) => subscribe(IpcChannel.PLAYER_ACTION, listener),
     },

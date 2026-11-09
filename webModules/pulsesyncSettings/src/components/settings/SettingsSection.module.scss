@@ -22,6 +22,55 @@
     gap: 8px;
 }
 
+.disclosure {
+    &[data-expanded='true'] {
+        border-radius: 12px;
+        background: var(--ym-background-color-secondary-enabled-basic, rgba(255, 255, 255, 0.04));
+    }
+}
+
+.disclosureBody:not([hidden]) {
+    display: grid;
+    gap: 6px;
+    padding: 0 8px 8px;
+}
+
+.disclosureButton {
+    display: grid;
+    place-items: center;
+    inline-size: 36px;
+    block-size: 36px;
+    padding: 0;
+    border: 0;
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+
+    &:hover {
+        background: var(--ym-background-color-secondary-enabled-basic, rgba(255, 255, 255, 0.1));
+    }
+
+    &:focus-visible {
+        outline: 2px solid currentColor;
+        outline-offset: -2px;
+    }
+
+    svg {
+        inline-size: 20px;
+        block-size: 20px;
+        fill: none;
+        stroke: currentColor;
+        stroke-width: 1.5;
+        stroke-linecap: round;
+        stroke-linejoin: round;
+    }
+
+    &[aria-expanded='true'] svg {
+        rotate: 180deg;
+    }
+}
+
 .heading {
     margin: 10px 2px 2px;
     color: var(--ym-controls-color-secondary-text-enabled, #a0a0a0);

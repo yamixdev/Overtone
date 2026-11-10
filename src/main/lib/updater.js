@@ -88,7 +88,7 @@ class Updater {
             this.logger.info('Common config', updateInfo.commonConfig);
             config_js_1.applyCommonConfig(updateInfo.commonConfig);
         }
-        if (downloadPromise !== null) {
+        if (!updateResult.isUpdateAvailable || downloadPromise !== null) {
             return;
         }
         const newVersion = updateInfo.version;
@@ -157,21 +157,23 @@ class Updater {
             });
     }
     async check() {
-        if (getUpdateChannel() !== 'yandex') return;
+        if (getUpdateChannel() !== 'yandex') return 'disabled';
         if (this.updateStatus === updateStatus_js_1.UpdateStatus.INSTALLING) {
             this.logger.log('Update is installing', this.updateStatus);
-            return;
+            return 'busy';
         }
         try {
             const updateResult = await electron_updater_1.autoUpdater.checkForUpdates();
-            if (getUpdateChannel() !== 'yandex') return;
+            if (getUpdateChannel() !== 'yandex') return 'disabled';
             if (!updateResult) {
                 this.logger.log('Updater is inactive');
-                return;
+                return 'error';
             }
             this.updateApplier(updateResult);
+            return updateResult.isUpdateAvailable ? 'available' : 'current';
         } catch (error) {
             this.logger.error('Update check error', error);
+            return 'error';
         }
     }
     start() {

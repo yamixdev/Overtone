@@ -18,6 +18,7 @@ type SchemaSettingsSectionProps = {
     displayMaxFps: number;
     onRestartRequired?: () => void;
     schema: SettingsSectionSchema;
+    extraItems?: readonly SettingsSchemaItem[];
 };
 
 type SettingDescriptor = {
@@ -85,7 +86,7 @@ function normalizeValue(value: unknown, fallback: StoredSettingValue): StoredSet
     return (value ?? null) as StoredSettingValue;
 }
 
-export function SchemaSettingsSection({ api, displayMaxFps, onRestartRequired, schema }: SchemaSettingsSectionProps) {
+export function SchemaSettingsSection({ api, displayMaxFps, onRestartRequired, schema, extraItems = [] }: SchemaSettingsSectionProps) {
     const platform = usePlatform(api);
     const ynisonExperimentEnabled = useYnisonExperimentEnabled();
     const descriptors = useMemo(() => collectDescriptors(schema), [schema]);
@@ -393,7 +394,7 @@ export function SchemaSettingsSection({ api, displayMaxFps, onRestartRequired, s
     return (
         <SettingsSection
             title={schema.title}
-            items={renderedItems}
+            items={[...renderedItems, ...extraItems]}
             error={(schema.requiresPremium ? premium.error : undefined) ?? error}
         />
     );

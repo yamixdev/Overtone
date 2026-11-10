@@ -1527,6 +1527,84 @@
             })();
             var u = s.i;
             s.X;
+            // for PulseSync: BEGIN share the visual playback clock across seek bars
+            r.d(t, { useVisualPlaybackProgress: () => useVisualPlaybackProgress });
+            function useVisualPlaybackProgress(ref, { position, duration, state, trackId, scrubbing, blocked, enabled = true, slider }) {
+                const lastSample = i.useRef(null);
+                const sliderWidth = i.useRef(0);
+                i.useLayoutEffect(() => {
+                    const element = slider?.current;
+                    if (!enabled || !element) return;
+                    sliderWidth.current = element.clientWidth;
+                    const observer = new ResizeObserver(([entry]) => {
+                        sliderWidth.current = entry.contentRect.width;
+                    });
+                    observer.observe(element);
+                    return () => observer.disconnect();
+                }, [slider, enabled]);
+
+                i.useLayoutEffect(() => {
+                    const element = ref.current;
+                    if (!element || !enabled || !state) return;
+                    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+                    const startedAt = performance.now();
+                    const previous = lastSample.current;
+                    const sameTrack = previous?.trackId === trackId && previous?.duration === duration;
+                    const advanced = sameTrack && position > previous.position;
+                    const limit = advanced && previous.playing ? Math.min(750, Math.max(80, (startedAt - previous.at) * 1.15)) : 0;
+                    lastSample.current = { trackId, duration, position, at: startedAt, playing: state.status.value === 'playing' && !blocked };
+                    let frame;
+                    const sliderElement = slider?.current;
+
+                    const reset = () => {
+                        element.style.removeProperty('--overtone-progress');
+                        sliderElement?.style.removeProperty('--overtone-thumb-offset');
+                    };
+                    const render = (now) => {
+                        if (document.hidden || motion.matches || blocked || scrubbing?.current || trackId == null || !Number.isFinite(duration) || duration <= 0) {
+                            reset();
+                            return;
+                        }
+                        if (state.status.value !== 'playing') {
+                            reset();
+                            return;
+                        }
+                        const rate = state.speed?.value ?? 1;
+                        if (!Number.isFinite(position) || !Number.isFinite(rate) || rate <= 0) {
+                            reset();
+                            return;
+                        }
+                        const elapsed = Math.min(limit, Math.max(0, now - startedAt));
+                        const displayed = Math.max(0, Math.min(duration, position + (elapsed * rate) / 1000));
+                        const fraction = displayed / duration;
+                        element.style.setProperty('--overtone-progress', fraction * 100 + '%');
+                        if (sliderElement && Number(sliderElement.max) > 0) {
+                            const nativeFraction = sliderElement.valueAsNumber / Number(sliderElement.max);
+                            sliderElement.style.setProperty('--overtone-thumb-offset', (fraction - nativeFraction) * sliderWidth.current + 'px');
+                        }
+                        if (elapsed < limit && displayed < duration) frame = requestAnimationFrame(render);
+                    };
+
+                    const sync = () => {
+                        cancelAnimationFrame(frame);
+                        reset();
+                    };
+                    const unsubscribe = state.status.onChange(() => {
+                        if (lastSample.current) lastSample.current.playing = false;
+                        sync();
+                    });
+                    motion.addEventListener('change', sync);
+                    document.addEventListener('visibilitychange', sync);
+                    render(startedAt);
+                    return () => {
+                        sync();
+                        unsubscribe?.();
+                        motion.removeEventListener('change', sync);
+                        document.removeEventListener('visibilitychange', sync);
+                    };
+                }, [ref, state, trackId, scrubbing, blocked, enabled, slider, position, duration]);
+            }
+            // for PulseSync: END share the visual playback clock across seek bars
         },
         60143: (e) => {
             e.exports = {

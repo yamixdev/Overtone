@@ -4,8 +4,6 @@ exports.setupTray = exports.updateTrayMenu = void 0;
 const electron_1 = require('electron');
 const node_path_1 = require('node:path');
 const deviceInfo_js_1 = require('./deviceInfo.js');
-const updater_js_1 = require('./updater.js');
-const modUpdater_js_1 = require('./modUpdater.js');
 const { getUpdateChannel } = require('./updateChannel.js');
 const formatters_js_1 = require('./i18n/formatters.js');
 const state_js_1 = require('./state.js');
@@ -45,8 +43,6 @@ const trayIcon = () => {
     return createIcoIcon();
 };
 const createContextMenu = (window) => {
-    const updater = (0, updater_js_1.getUpdater)();
-    const modUpdater = (0, modUpdater_js_1.getModUpdater)();
     const windowStateLabel = state_js_1.state.isMinimized
         ? (0, formatters_js_1.formatMessage)({ id: 'windows-menu.unwrap' })
         : (0, formatters_js_1.formatMessage)({ id: 'windows-menu.roll-up' });
@@ -64,8 +60,8 @@ const createContextMenu = (window) => {
             label: (0, formatters_js_1.formatMessage)({ id: 'desktop.check-for-updates' }),
             enabled: getUpdateChannel() !== 'off',
             click() {
-                if (getUpdateChannel() === 'yandex') void updater.check();
-                else void modUpdater.check();
+                window.show();
+                void events_js_1.checkClientUpdate(window);
             },
         },
         {

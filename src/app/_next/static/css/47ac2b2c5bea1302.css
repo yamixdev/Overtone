@@ -97,6 +97,37 @@
     overflow: hidden;
     width: 100%;
 }
+[data-overtone-playerbar-cover] {
+    position: absolute;
+    inset: 0;
+    overflow: hidden;
+    border-radius: inherit;
+    pointer-events: none;
+}
+[data-overtone-playerbar-cover] img {
+    position: absolute;
+    inset: -2rem;
+    width: calc(100% + 4rem);
+    height: calc(100% + 4rem);
+    object-fit: cover;
+    filter: blur(1.4rem) saturate(1.18);
+    opacity: 0;
+    transition: opacity 240ms ease-out;
+}
+[data-overtone-playerbar-cover] img[data-loaded] {
+    opacity: 0.42;
+}
+.ym-dark-theme [data-overtone-playerbar-cover] img {
+    filter: blur(1.4rem) saturate(1.18) brightness(0.68);
+}
+.ym-light-theme [data-overtone-playerbar-cover] img[data-loaded] {
+    opacity: 0.28;
+}
+@media (prefers-reduced-motion: reduce) {
+    [data-overtone-playerbar-cover] img {
+        transition: none;
+    }
+}
 .PlayerBarDesktopWithBackgroundProgressBar_playerBar__mp0p9:has(:focus-visible) .PlayerBarDesktopWithBackgroundProgressBar_progressBar___Q6eK,
 .PlayerBarDesktopWithBackgroundProgressBar_playerBar__mp0p9:has(:focus-visible) .PlayerBarDesktopWithBackgroundProgressBar_thumb__LHPFo,
 .PlayerBarDesktopWithBackgroundProgressBar_playerBar__mp0p9:hover .PlayerBarDesktopWithBackgroundProgressBar_progressBar___Q6eK,
@@ -276,6 +307,12 @@
 .ChangeTimecode_slider__P4qmT {
     --slider-thumb-box-shadow-color: var(--player-average-color-background);
     grid-area: slider;
+}
+.ChangeTimecode_root_fullscreen__FA6r0 .ChangeTimecode_slider__P4qmT:not(:active)::before {
+    width: var(--overtone-progress, var(--seek-before-width));
+}
+.ChangeTimecode_root_fullscreen__FA6r0 .ChangeTimecode_slider__P4qmT:not(:active)::-webkit-slider-thumb {
+    translate: var(--overtone-thumb-offset, 0px) 0;
 }
 .PlayerBarMobile_root__cdKy_ {
     --player-cover-width: 3rem;

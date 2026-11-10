@@ -161,6 +161,7 @@ const init = () => {
         },
         playerBarEnhancement: {
             fullscreenCoverBackground: false,
+            playerBarCoverBackground: false,
             showCodecInsteadOfQualityMark: true,
             alwaysShowTimestamps: false,
             changeDislikeButtonPos: true,
@@ -198,6 +199,8 @@ const init = () => {
         },
         appAutoUpdates: {
             channel: require('./updateChannel.js').getUpdateChannel(),
+            autoDownload: false,
+            installDownloadedOnStartup: false,
             enableAppAutoUpdateByProbability: false,
         },
         scrobblers: {

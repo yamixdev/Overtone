@@ -24,7 +24,6 @@ const { getUpdateChannel } = require('./lib/updateChannel.js');
 const miniPlayer_js_1 = require('./lib/miniplayer/miniplayer.js');
 const { getFfmpegUpdater } = require('./lib/ffmpegInstaller.js');
 const { getYtDlpInstaller } = require('./lib/ytDlpInstaller.js');
-const { throttle } = require('./lib/utils.js');
 const pulsesyncDevConfig_js_1 = require('./lib/pulsesyncDevConfig.js');
 const pulsesyncDevReload_js_1 = require('./lib/pulsesyncDevReload.js');
 
@@ -96,6 +95,7 @@ const MiniPlayer = miniPlayer_js_1.getMiniPlayer();
     const registerShortcut = process.platform === 'win32' && electron_1.app.isPackaged;
     electron_1.app.setAppUserModelId(registerShortcut ? windowsAppId : 'ru.yandex.desktop.music');
     await electron_1.app.whenReady();
+    if (!pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled && (await modUpdater.restore())) return;
     if (registerShortcut) registerWindowsAppShortcut();
     await require('./lib/certificateVerification.js').setupCertificateVerification({ updater });
     const window = await (0, createWindow_js_1.createWindow)();
@@ -117,6 +117,16 @@ const MiniPlayer = miniPlayer_js_1.getMiniPlayer();
     (0, handleHeadersReceived_js_1.handleHeadersReceived)(window);
     (0, handleBackgroundTasks_js_1.handleBackgroundTasks)(window);
     (0, handleCrash_js_1.handleCrash)();
+    modUpdater.onUpdateAvailable((currVersion, newVersion, portable, progress, allowAutoDownload) => {
+        if (newVersion === null) {
+            events_js_1.sendBasicToastDismiss(window, 'modUpdateToast');
+            return;
+        }
+        events_js_1.sendModUpdateAvailable(window, currVersion, newVersion, portable, progress);
+        if (allowAutoDownload && !portable && store_js_1.getModSettings()?.appAutoUpdates?.autoDownload === true) {
+            void events_js_1.downloadModUpdate(window);
+        }
+    });
     await (0, loadURL_js_1.loadURL)(window);
     (0, pulsesyncDevReload_js_1.setupPulseSyncDevReload)(window);
     if ([platform_js_1.Platform.WINDOWS, platform_js_1.Platform.LINUX].includes(deviceInfo_js_1.devicePlatform)) {
@@ -128,16 +138,6 @@ const MiniPlayer = miniPlayer_js_1.getMiniPlayer();
         });
         updater.start();
     }
-    modUpdater.onUpdateAvailable((currVersion, newVersion, portable) => {
-        (0, events_js_1.sendModUpdateAvailable)(window, currVersion, newVersion, portable);
-        if (portable) return;
-        let callback = (progressRenderer, progressWindow) => {
-            if (window.isDestroyed()) return;
-            events_js_1.sendProgressBarChange(window, 'modUpdateToast', progressRenderer * 100);
-            window.setProgressBar(progressWindow);
-        };
-        (0, modUpdater_js_1.getModUpdater)().onUpdateDownload(throttle(callback, 200));
-    });
     if (!pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled) {
         modUpdater.start();
     }

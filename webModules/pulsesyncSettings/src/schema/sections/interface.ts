@@ -136,6 +136,13 @@ export const playerBarSchema = defineSettingsSection({
             description: 'Показывает размытую обложку трека за раскрытым плеером, текстом песни и очередью.',
         },
         {
+            type: 'toggle',
+            key: `${PLAYER_PREFIX}playerBarCoverBackground`,
+            defaultValue: false,
+            title: 'Фон нижнего плеера из обложки',
+            description: 'Размывает обложку текущего трека за кнопками нижней панели.',
+        },
+        {
             type: 'select',
             key: `${PLAYER_PREFIX}playButtonType`,
             defaultValue: 'yellow',

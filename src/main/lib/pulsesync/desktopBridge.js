@@ -57,8 +57,9 @@ const createPulseSyncDesktopBridge = (subscribe) => ({
         onValidationConnectionError: (listener) => subscribe(Events.PULSESYNC_VALIDATION_CONNECTION_ERROR, listener),
     },
     updates: {
-        download: () => ipcRenderer.send(Events.DOWNLOAD_MOD_UPDATE),
+        download: () => ipcRenderer.invoke(Events.DOWNLOAD_MOD_UPDATE),
         install: () => ipcRenderer.invoke(Events.INSTALL_MOD_UPDATE),
+        manage: (action) => ipcRenderer.invoke(Events.MANAGE_UPDATES, action),
         onAvailable: (listener) => subscribe(Events.MOD_UPDATE_AVAILABLE, listener),
     },
     app: {

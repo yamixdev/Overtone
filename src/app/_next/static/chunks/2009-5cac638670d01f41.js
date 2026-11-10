@@ -1824,6 +1824,11 @@
                 var t, i;
                 let {
                         progress: a,
+                        // for PulseSync: BEGIN use precise Wave timing and the active seek gesture
+                        visualPosition,
+                        visualDuration,
+                        seekRef,
+                        // for PulseSync: END use precise Wave timing and the active seek gesture
                         isChangingTimecode: n,
                         shouldShowArtists: r,
                         shouldKeepMobileSpacingOnPause: s,
@@ -1832,7 +1837,7 @@
                         children: d,
                         slider: c,
                         overlay: m,
-                        tooltip: p,
+                        tooltip: tooltipContent,
                         isOverlayVisible: b = !1,
                         ref: v,
                         centerDataTestId: h,
@@ -1847,10 +1852,28 @@
                             : ((e) => {
                                   if ('default' !== e && void 0 !== e) return 'on1' === e ? '150ms' : '0ms';
                               })(null == (t = x.getExperiment(G.z.WebNextMainPlayerAnimation)) ? void 0 : t.group),
-                        '--progress-transition': n ? 'none' : void 0,
                     };
+                // for PulseSync: BEGIN animate the Wave progress without changing seek values
+                const player = (0, th.e)();
+                const visualProgressRef = (0, p.useRef)(null);
+                const attachProgress = (0, p.useCallback)((element) => {
+                    visualProgressRef.current = element;
+                    if (typeof v === 'function') return v(element);
+                    if (v) v.current = element;
+                }, [v]);
+                (0, t9.useVisualPlaybackProgress)(visualProgressRef, {
+                    position: visualPosition,
+                    duration: visualDuration,
+                    state: player?.state.playerState,
+                    trackId: C?.idWithContext ?? C?.id,
+                    scrubbing: seekRef,
+                    blocked: n || A.isGenerativeContext,
+                });
+                // for PulseSync: END animate the Wave progress without changing seek values
                 return (0, u.jsxs)('div', {
-                    ref: v,
+                    // for PulseSync: BEGIN attach the Wave progress clock alongside the measurement ref
+                    ref: attachProgress,
+                    // for PulseSync: END attach the Wave progress clock
                     className: ip().root,
                     style: f,
                     'data-test-id': g,
@@ -1886,7 +1909,7 @@
                                 !A.isGenerativeContext && c,
                             ],
                         }),
-                        p,
+                        tooltipContent,
                     ],
                 });
             });
@@ -2018,6 +2041,11 @@
                         R = s.checkExperiment(G.z.WebNextPlayerTimecodeTooltip, 'on') ? ij : ig;
                     return (0, u.jsx)(R, {
                         position: P,
+                        // for PulseSync: BEGIN pass Wave timing to both title layout variants
+                        visualPosition: P,
+                        visualDuration: g,
+                        seekRef: C,
+                        // for PulseSync: END pass Wave timing to both title layout variants
                         duration: g,
                         progress: S,
                         isVisible: y,

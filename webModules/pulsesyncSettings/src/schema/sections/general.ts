@@ -123,6 +123,7 @@ export const appSectionsSchema = defineSettingsSection({
 });
 
 const UPDATE_CHANNEL_KEY = 'modSettings.appAutoUpdates.channel';
+const isOvertoneChannel = (channel: string) => channel === 'overtone' || channel === 'overtone-beta';
 
 export const appUpdatesSchema = defineSettingsSection({
     title: 'Обновления',
@@ -166,6 +167,22 @@ export const appUpdatesSchema = defineSettingsSection({
             description: 'Выключает участие в получении обновлений волнами',
             hiddenWhen: (context) => context.getString(UPDATE_CHANNEL_KEY) !== 'yandex',
             restartRequired: true,
+        },
+        {
+            type: 'toggle',
+            key: 'modSettings.appAutoUpdates.autoDownload',
+            defaultValue: false,
+            title: 'Скачивать обновления автоматически',
+            description: 'Скачивает новый установщик Overtone в фоне. Для portable доступен ZIP.',
+            hiddenWhen: (context) => !isOvertoneChannel(context.getString(UPDATE_CHANNEL_KEY)),
+        },
+        {
+            type: 'toggle',
+            key: 'modSettings.appAutoUpdates.installDownloadedOnStartup',
+            defaultValue: false,
+            title: 'Устанавливать скачанное обновление при запуске',
+            description: 'В установленной версии Overtone применяет скачанное обновление перед открытием окна.',
+            hiddenWhen: (context) => !isOvertoneChannel(context.getString(UPDATE_CHANNEL_KEY)),
         },
     ],
 });

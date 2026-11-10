@@ -976,110 +976,70 @@
                 pulseToastStylesModule = t(90945),
                 pulseToastStyles = t.n(pulseToastStylesModule),
                 pulseToastIntl = t(2058);
-            const PulseSyncModUpdateToast = (e) => {
-                // for PulseSync: BEGIN show the ZIP action for portable Overtone updates
-                let { version: t, formatMessage: a, closeToast: n, operation, portable } = e,
-                    // for PulseSync: END show the ZIP action for portable Overtone updates
-                    [o, l] = (0, pulseToastReact.useState)(operation.progress),
-                    // for PulseSync: BEGIN keep the update notice visible if setup cannot start
-                    u = (0, pulseToastReact.useCallback)(async () => {
-                        if (await window.musicDesktop?.pulsesync.updates.install?.()) n?.();
-                    }, [n]),
-                    // for PulseSync: END keep the update notice visible if setup cannot start
-                    d = (0, pulseToastReact.useCallback)(() => {
-                        window.musicDesktop?.pulsesync.updates.download?.();
-                    }, []),
-                    c = (e) => {
-                        let t = a({
-                            id: 'offline.download',
-                        });
-                        return (
-                            e < 0
-                                ? (t = a({
-                                      id: 'offline.download',
-                                  }))
-                                : e >= 0 && e <= 100
-                                  ? (t = 'Скачивание…')
-                                  : e > 100 && (t = 'Установить'),
-                            t
-                        );
-                    },
-                    h = (0, pulseToastReact.useMemo)(
-                        () =>
-                            (0, pulseToastJsx.jsxs)('div', {
-                                className: pulseToastStyles().message,
-                                children: [
-                                    (0, pulseToastJsx.jsx)(pulseToastText.HL, {
-                                        className: pulseToastStyles().text,
-                                        variant: 'div',
-                                        type: 'controls',
-                                        size: 'm',
-                                        children: a(
-                                            {
-                                                id: 'desktop.on-mod-update-available',
-                                                defaultMessage: 'Mod update available {version}',
-                                            },
-                                            {
-                                                version: t,
-                                            },
-                                        ),
-                                    }),
-                                    (0, pulseToastJsx.jsx)(pulseToastButton.$, {
-                                        className: pulseToastStyles().button,
-                                        // for PulseSync: BEGIN open the portable ZIP or run the installed updater
-                                        onClick: portable || o <= 100 ? d : u,
-                                        // for PulseSync: END open the portable ZIP or run the installed updater
-                                        variant: 'default',
-                                        color: 'secondary',
-                                        size: 'xs',
-                                        radius: 'xxxl',
-                                        disabled: o <= 100 && o >= 0,
-                                        children: (0, pulseToastJsx.jsx)(pulseToastText.HL, {
-                                            variant: 'div',
-                                            type: 'controls',
-                                            size: 'm',
-                                                // for PulseSync: BEGIN label the portable update download
-                                                children: portable ? 'Скачать ZIP' : c(o),
-                                                // for PulseSync: END label the portable update download
-                                        }),
-                                    }),
-                                ],
-                            }),
-                        // for PulseSync: BEGIN refresh the toast when portable mode changes
-                        [a, u, t, o, d, portable],
-                        // for PulseSync: END refresh the toast when portable mode changes
-                    ),
-                    v = () => l(operation.progress);
-                return (
-                    pulseToastReact.useEffect(() => {
-                        operation.listeners.add(v);
-                        v();
-                        return () => operation.listeners.delete(v);
-                    }, [operation]),
-                    void 0,
-                    (0, pulseToastJsx.jsxs)(pulseToastBase.$, {
-                        className: (0, pulseToastClassNames.$)(pulseToastStyles().root, pulseToastStyles().important),
-                        message: h,
+            // for PulseSync: BEGIN display Overtone download and install progress in the action
+            const PulseSyncModUpdateToast = ({ version, formatMessage, closeToast, operation, portable }) => {
+                const [progress, setProgress] = pulseToastReact.useState(operation.progress);
+                const [pending, setPending] = pulseToastReact.useState(false);
+                const busy = pulseToastReact.useRef(false);
+                const downloading = progress >= 0 && progress <= 100;
+                const waiting = pending || progress === -200;
+                const ready = progress > 100;
+                const label = downloading ? Math.floor(progress) + '%' : waiting ? 'Подождите' : portable ? 'Скачать ZIP' : ready ? 'Установить' : 'Скачать';
+                const activate = async () => {
+                    if (busy.current || downloading || waiting) return;
+                    busy.current = true;
+                    setPending(true);
+                    try {
+                        const updates = window.musicDesktop?.pulsesync.updates;
+                        if (ready && !portable) {
+                            if (await updates?.install()) closeToast?.();
+                        } else {
+                            await updates?.download();
+                        }
+                    } catch (error) {
+                        console.error('Overtone update action failed', error);
+                    } finally {
+                        busy.current = false;
+                        setPending(false);
+                    }
+                };
+                pulseToastReact.useEffect(() => {
+                    const sync = () => setProgress(operation.progress);
+                    operation.listeners.add(sync);
+                    sync();
+                    return () => operation.listeners.delete(sync);
+                }, [operation]);
+                return (0, pulseToastJsx.jsx)(pulseToastBase.$, {
+                    className: (0, pulseToastClassNames.$)(pulseToastStyles().root, pulseToastStyles().important),
+                    message: (0, pulseToastJsx.jsxs)('div', {
+                        className: pulseToastStyles().message,
                         children: [
-                            (0, pulseToastJsx.jsx)('div', {
-                                className: 'qaIScXjx1qyXuaIHXQIo',
-                                style: {
-                                    overflow: 'hidden',
-                                    left: '0',
-                                    top: '0',
-                                    position: 'absolute',
-                                    width: o + '%',
-                                    height: '100%',
-                                    backgroundColor: 'rgb(255 255 255)',
-                                    opacity: o <= 100 ? 0.1 : 0,
-                                    zIndex: 1,
-                                    transition: 'opacity 0.3s linear 0.5s, width 0.2s',
-                                },
+                            (0, pulseToastJsx.jsx)(pulseToastText.HL, {
+                                className: pulseToastStyles().text,
+                                variant: 'div',
+                                type: 'controls',
+                                size: 'm',
+                                children: formatMessage(
+                                    { id: 'desktop.on-mod-update-available', defaultMessage: 'Mod update available {version}' },
+                                    { version },
+                                ),
+                            }),
+                            (0, pulseToastJsx.jsx)(pulseToastButton.$, {
+                                className: pulseToastStyles().button,
+                                onClick: activate,
+                                variant: 'default',
+                                color: 'secondary',
+                                size: 'xs',
+                                radius: 'xxxl',
+                                disabled: downloading || waiting,
+                                'aria-busy': downloading || waiting,
+                                children: label,
                             }),
                         ],
-                    })
-                );
+                    }),
+                });
             };
+            // for PulseSync: END display Overtone download and install progress in the action
             const PulseSyncProgressToast = (e) => {
                 let { closeToast: t, message: n, buttonLabel: o, onButtonClick: l, disabled: u = false, dismissOnButtonClick: d = false, operation } = e;
                 const [h, v] = pulseToastReact.useState(operation.progress),
@@ -1213,14 +1173,20 @@
                         close(operation);
                     };
                     // for PulseSync: BEGIN carry portable update mode into the notification
-                    const modUpdate = (currentVersion, newVersion, nonce = 0, portable = false) => {
+                    const modUpdate = (currentVersion, newVersion, nonce = 0, portable = false, initialProgress = -100) => {
                         const version = String(currentVersion) + ' -> ' + newVersion;
-                        if (operations.get('modUpdateToast')?.version === version) return;
+                        if (operations.get('modUpdateToast')?.version === version) {
+                            progress('modUpdateToast', initialProgress);
+                            return;
+                        }
                         const operation = create('modUpdateToast', '', '', nonce ? version + ':' + nonce : 0, undefined, undefined, {
                             component: PulseSyncModUpdateToast,
                             props: { version, formatMessage, portable },
                         });
-                        if (operation) operation.version = version;
+                        if (operation) {
+                            operation.version = version;
+                            progress('modUpdateToast', initialProgress);
+                        }
                     };
                     // for PulseSync: END carry portable update mode into the notification
                     const gpuStall = (reason = 'GPU_STALL', nonce = 0) => {

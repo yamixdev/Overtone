@@ -4339,6 +4339,17 @@
                             }
                         );
                     }, []);
+                    // for PulseSync: BEGIN animate the compact player progress without changing seek values
+                    const visualProgressRef = (0, f.useRef)(null);
+                    (0, iE.useVisualPlaybackProgress)(visualProgressRef, {
+                        position: w,
+                        duration: P,
+                        state: x?.playerState,
+                        trackId: N.entityMeta?.idWithContext ?? N.entityMeta?.id,
+                        scrubbing: g,
+                        blocked: s || A.isAdvertShown || V || Y,
+                    });
+                    // for PulseSync: END animate the compact player progress without changing seek values
                     let Q = {
                         '--size-thumb': ''.concat(12, 'px'),
                         '--track-progress': ''.concat(R, '%'),
@@ -4348,6 +4359,9 @@
                     return (0, m.jsxs)('div', {
                         className: (0, p.$)(iK().root, { [iK().root_focusVisible]: z, [iK().root_isPlayingTrack]: !A.isAdvertShown }),
                         style: Q,
+                        // for PulseSync: BEGIN attach the compact progress clock
+                        ref: visualProgressRef,
+                        // for PulseSync: END attach the compact progress clock
                         'data-test-id': S.Kq.changeTimecode.TIMECODE_WRAPPER,
                         children: [
                             !l &&
@@ -4932,6 +4946,30 @@
             const pulseSyncPlayerBarRefreshers = new Set();
             const pulseSyncRefreshPlayerBars = () => pulseSyncPlayerBarRefreshers.forEach((refresh) => refresh());
             // for PulseSync: END Yandex Station device picker and player-bar refresh callbacks
+            // for PulseSync: BEGIN render a blurred cover behind the lower player
+            const overtoneCoverImages = a(35412);
+            const OvertonePlayerBarCover = ({ uri }) => {
+                const key = 'modSettings.playerBarEnhancement.playerBarCoverBackground';
+                const [enabled, setEnabled] = (0, f.useState)(() => window.nativeSettings?.get(key) === true);
+                (0, f.useEffect)(
+                    () => window.musicDesktop?.pulsesync.settings.onChange?.((changedKey, value) => {
+                        if (changedKey === key) setEnabled(value === true);
+                    }),
+                    [],
+                );
+                if (!enabled || !uri) return null;
+                return (0, m.jsx)('div', {
+                    'data-overtone-playerbar-cover': '',
+                    'aria-hidden': true,
+                    children: (0, m.jsx)('img', {
+                        src: (0, overtoneCoverImages.lU)(uri, 600),
+                        alt: '',
+                        decoding: 'async',
+                        onLoad: (event) => event.currentTarget.setAttribute('data-loaded', ''),
+                    }, uri),
+                });
+            };
+            // for PulseSync: END render a blurred cover behind the lower player
             let n_ = (0, v.PA)((e) => {
                 var t;
                 // for PulseSync: BEGIN register player-bar rerender callbacks for live mod preferences
@@ -5265,6 +5303,9 @@
                     children: (0, m.jsxs)('div', {
                         className: nu().playerBar,
                         children: [
+                            // for PulseSync: BEGIN add the cover layer below player controls
+                            (0, m.jsx)(OvertonePlayerBarCover, { uri: P.isAdvertShown ? undefined : i?.coverUri }),
+                            // for PulseSync: END add the cover layer below player controls
                             !N.isGenerativeContext &&
                                 (0, m.jsx)(iJ, {
                                     sliderClassName: nu().slider,
@@ -7099,13 +7140,33 @@
                 let X = (0, d.L)(() => {
                     if (0 !== O) return B && B <= O ? Math.round(B) : Math.round(O);
                 });
+                // for PulseSync: BEGIN animate the fullscreen slider while preserving its native range
+                const visualProgressRef = (0, r.useRef)(null);
+                const sliderRef = (0, r.useRef)(null);
+                (0, c.useVisualPlaybackProgress)(visualProgressRef, {
+                    position: L,
+                    duration: O,
+                    state: V?.playerState,
+                    trackId: k.entityMeta?.idWithContext ?? k.entityMeta?.id,
+                    scrubbing: P,
+                    blocked: N || z.isAdvertShown,
+                    enabled: C,
+                    slider: sliderRef,
+                });
+                // for PulseSync: END animate the fullscreen slider while preserving its native range
                 return (0, i.jsxs)('div', {
                     className: (0, n.$)(b().root, { [b().root_fullscreen]: C, [b().root_mobile]: y, [b().root_withTimecode]: E }, g),
                     style: { '--track-progress': ''.concat(K, '%') },
+                    // for PulseSync: BEGIN attach the fullscreen progress clock
+                    ref: visualProgressRef,
+                    // for PulseSync: END attach the fullscreen progress clock
                     'data-test-id': s.Kq.changeTimecode.TIMECODE_WRAPPER,
                     children: [
                         j && (0, i.jsx)(x.d, { role: 'text', 'aria-label': H, value: G, variant: 'start', className: b().timecode }),
                         (0, i.jsx)(c.A, {
+                            // for PulseSync: BEGIN attach the fullscreen slider thumb
+                            ref: sliderRef,
+                            // for PulseSync: END attach the fullscreen slider thumb
                             'aria-valuetext': H,
                             className: (0, n.$)(b().slider, { [b()['slider_thumbSize_'.concat(y ? 'xs' : 'm')]]: !0 }, A),
                             disabled: N,

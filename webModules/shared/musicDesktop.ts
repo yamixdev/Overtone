@@ -129,9 +129,10 @@ export type PulseSyncDesktopBridge = {
         onValidationConnectionError: Subscription<[state: { failed: boolean; blocking: boolean }]>;
     };
     updates: {
-        download: () => void;
+        download: () => Promise<boolean>;
         install: () => Promise<boolean>;
-        onAvailable: Subscription<[currentVersion: string, newVersion: string, nonce?: number, portable?: boolean]>;
+        manage: (action: 'check-client' | 'check-components' | 'clear-cache') => Promise<void>;
+        onAvailable: Subscription<[currentVersion: string, newVersion: string, nonce?: number, portable?: boolean, progress?: number]>;
     };
     app: {
         restart: () => void;

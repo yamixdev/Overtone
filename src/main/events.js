@@ -46,6 +46,7 @@ const pulsesyncDevConfig_js_1 = require('./lib/pulsesyncDevConfig.js');
 
 const isAccelerator = require('electron-is-accelerator');
 const modUpdater_js_1 = require('./lib/modUpdater.js');
+const { getUpdateChannel } = require('./lib/updateChannel.js');
 
 const { getAllowedUrls } = require('./lib/handlers/handleHeadersReceived/corsHandler');
 const trackDownloader_js_1 = require('./lib/trackDownloader/trackDownloader.js');
@@ -915,6 +916,9 @@ const handleApplicationEvents = (window) => {
             startupPlaybackTimer = setTimeout(startPlaybackOnStartup, 4000);
         }
 
+        modUpdater_js_1.getModUpdater().announce();
+        void checkComponentUpdates(window);
+
         const version = electron_1.app.getVersion();
         const releaseNotes = await (0, loadReleaseNotes_js_1.loadReleaseNotes)(language);
         if (!releaseNotes) {
@@ -952,54 +956,6 @@ const handleApplicationEvents = (window) => {
             sortedDescReleaseNotesKeys,
             translationsReleaseNotes,
         });
-        const ffmpegInstaller = getFfmpegUpdater();
-
-        if (!(await ffmpegInstaller.isInstalled())) {
-            const ffmpegToastNonce = sendBasicToastCreate(window, 'ffmpeg', 'Обновление компонента: ffmpeg', false);
-
-            let callback = (progressRenderer, progressWindow) => {
-                sendProgressBarChange(window, 'ffmpeg', progressRenderer * 100, undefined, ffmpegToastNonce);
-                window.setProgressBar(progressWindow);
-            };
-            ffmpegInstaller
-                .ensureInstalled(throttle(callback, PROGRESS_BAR_THROTTLE_MS))
-                .then(() => {
-                    sendBasicToastDismiss(window, 'ffmpeg', ffmpegToastNonce);
-                })
-                .catch((err) => {
-                    sendProgressBarChange(window, 'ffmpeg', -1, undefined, ffmpegToastNonce);
-                    eventsLogger.error(err);
-                    setTimeout(() => {
-                        sendBasicToastDismiss(window, 'ffmpeg', ffmpegToastNonce);
-                    }, 2500);
-                });
-        }
-
-        const ytDlpInstaller = getYtDlpInstaller();
-        if (await ytDlpInstaller.hasInstalledBinary()) {
-            const isInstalled = await ytDlpInstaller.isInstalled();
-            if (!isInstalled) {
-                const ytDlpToastNonce = sendBasicToastCreate(window, 'yt-dlp', 'Обновление компонента: yt-dlp', false);
-
-                let callback = (progressRenderer, progressWindow) => {
-                    sendProgressBarChange(window, 'yt-dlp', progressRenderer * 100, undefined, ytDlpToastNonce);
-                    window.setProgressBar(progressWindow);
-                };
-                ytDlpInstaller
-                    .ensureInstalled(throttle(callback, PROGRESS_BAR_THROTTLE_MS))
-                    .then(() => {
-                        sendBasicToastDismiss(window, 'yt-dlp', ytDlpToastNonce);
-                    })
-                    .catch((err) => {
-                        sendProgressBarChange(window, 'yt-dlp', -1, undefined, ytDlpToastNonce);
-                        eventsLogger.error(err);
-                        setTimeout(() => {
-                            sendBasicToastDismiss(window, 'yt-dlp', ytDlpToastNonce);
-                        }, 2500);
-                    });
-            }
-        }
-
         if (PULSESYNC_APP_AUTO_INSTALL_ENABLED) {
             const pulseSyncInstaller = getPulseSyncAppInstaller();
             if (!(await pulseSyncInstaller.isInstalled())) {
@@ -1135,23 +1091,43 @@ const handleApplicationEvents = (window) => {
         (0, discordRichPresence_js_1.fromYnisonState)(structuredClone(data));
     });
 
-    ipcRegistry.on(events_js_1.Events.DOWNLOAD_MOD_UPDATE, async (event) => {
-        if (event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) return;
-        eventsLogger.info(`Event received`, events_js_1.Events.DOWNLOAD_MOD_UPDATE);
+    ipcRegistry.handle(events_js_1.Events.DOWNLOAD_MOD_UPDATE, async (event) => {
+        if (event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) return false;
+        const downloaded = await downloadModUpdate(window);
+        if (!downloaded) showUpdateResult(window, 'modUpdateActionResult', 'Не удалось скачать обновление Overtone');
+        return downloaded;
+    });
 
-        let callback = (progressRenderer, progressWindow) => {
-            if (window.isDestroyed()) return;
-            sendProgressBarChange(window, 'modUpdateToast', progressRenderer * 100);
-            window.setProgressBar(progressWindow);
-        };
-        await (0, modUpdater_js_1.getModUpdater)().onUpdateDownload(throttle(callback, PROGRESS_BAR_THROTTLE_MS));
+    ipcRegistry.handle(events_js_1.Events.MANAGE_UPDATES, async (event, action) => {
+        if (event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) return;
+        switch (action) {
+            case 'check-client':
+                return checkClientUpdate(window);
+            case 'check-components':
+                return checkComponentUpdates(window, true);
+            case 'clear-cache': {
+                let message;
+                try {
+                    const result = await modUpdater_js_1.getModUpdater().clearCache();
+                    message = result === 'cleared' ? 'Скачанные пакеты Overtone удалены' : 'Дождитесь завершения обновления клиента';
+                } catch (error) {
+                    eventsLogger.error('Could not clear Overtone updates', error);
+                    message = 'Не удалось удалить скачанные обновления';
+                }
+                showUpdateResult(window, 'updateCacheResult', message);
+                return;
+            }
+        }
     });
 
     ipcRegistry.handle(events_js_1.Events.INSTALL_MOD_UPDATE, async (event) => {
         if (event.sender !== window.webContents || event.senderFrame !== event.sender.mainFrame) return false;
         eventsLogger.info(`Event received`, events_js_1.Events.INSTALL_MOD_UPDATE);
         const installed = await (0, modUpdater_js_1.getModUpdater)().onInstallUpdate();
-        if (!installed) sendProgressBarChange(window, 'modUpdateToast', -100);
+        if (!installed) {
+            modUpdater_js_1.getModUpdater().announce();
+            showUpdateResult(window, 'modUpdateActionResult', 'Не удалось запустить установку Overtone');
+        }
         return installed;
     });
 
@@ -1324,8 +1300,8 @@ const sendUpdateAvailable = (window, version) => {
     eventsLogger.info('Event sent', IpcChannel.UPDATE_AVAILABLE, version);
 };
 exports.sendUpdateAvailable = sendUpdateAvailable;
-const sendModUpdateAvailable = (window, currVersion, newVersion, portable) => {
-    sendToApplicationRenderer(window, events_js_1.Events.MOD_UPDATE_AVAILABLE, currVersion, newVersion, Date.now(), portable);
+const sendModUpdateAvailable = (window, currVersion, newVersion, portable, progress) => {
+    sendToApplicationRenderer(window, events_js_1.Events.MOD_UPDATE_AVAILABLE, currVersion, newVersion, Date.now(), portable, progress);
     eventsLogger.info('Event sent', events_js_1.Events.MOD_UPDATE_AVAILABLE, currVersion, newVersion);
 };
 exports.sendModUpdateAvailable = sendModUpdateAvailable;
@@ -1342,6 +1318,84 @@ const sendBasicToastDismiss = (window = mainWindow, toastID, operationNonce) => 
     eventsLogger.info('Event sent', events_js_1.Events.BASIC_TOAST_DISMISS, toastID);
 };
 exports.sendBasicToastDismiss = sendBasicToastDismiss;
+
+function showUpdateResult(window, id, message) {
+    const nonce = sendBasicToastCreate(window, id, message, 'Закрыть');
+    setTimeout(() => sendBasicToastDismiss(window, id, nonce), 4500).unref();
+}
+
+async function checkClientUpdate(window) {
+    const channel = getUpdateChannel();
+    const status = channel === 'yandex' ? await updater_js_1.getUpdater().check() : await modUpdater_js_1.getModUpdater().check({ manual: true });
+    const messages = {
+        current: 'Сейчас актуальная версия клиента',
+        disabled: 'Проверка обновлений клиента выключена',
+        busy: 'Проверка или обновление клиента уже идёт',
+        error: 'Не удалось проверить обновления клиента',
+        available: channel === 'yandex' ? 'Доступно обновление Яндекс Музыки' : null,
+    };
+    if (messages[status]) showUpdateResult(window, 'clientUpdateResult', messages[status]);
+}
+exports.checkClientUpdate = checkClientUpdate;
+
+function downloadModUpdate(window) {
+    let lastProgressAt = 0;
+    return modUpdater_js_1.getModUpdater().onUpdateDownload((progress, windowProgress) => {
+        if (window.isDestroyed()) return;
+        const now = Date.now();
+        if (progress > 0 && progress < 1 && now - lastProgressAt < PROGRESS_BAR_THROTTLE_MS) return;
+        lastProgressAt = now;
+        sendProgressBarChange(window, 'modUpdateToast', progress * 100);
+        window.setProgressBar(windowProgress);
+    });
+}
+exports.downloadModUpdate = downloadModUpdate;
+
+let componentCheck;
+function checkComponentUpdates(window, manual = false) {
+    componentCheck ??= updateComponents(window).finally(() => {
+        componentCheck = undefined;
+    });
+    const check = componentCheck;
+    if (!manual) return check;
+    return check.then((status) => {
+        const messages = {
+            current: 'Сейчас стоят актуальные компоненты',
+            updated: 'Компоненты обновлены',
+            error: 'Не удалось проверить или обновить все компоненты',
+        };
+        showUpdateResult(window, 'componentUpdateResult', messages[status]);
+    });
+}
+
+async function updateComponents(window) {
+    const components = [['ffmpeg', getFfmpegUpdater()], ['yt-dlp', getYtDlpInstaller()]];
+    let status = 'current';
+    for (const [name, installer] of components) {
+        let nonce;
+        try {
+            if (name === 'yt-dlp' && !(await installer.hasInstalledBinary())) continue;
+            if (await installer.isInstalled({ verifyLatest: true })) continue;
+            nonce = sendBasicToastCreate(window, name, 'Обновление компонента: ' + name, false);
+            let lastProgressAt = 0;
+            await installer.ensureInstalled((progress) => {
+                if (window.isDestroyed()) return;
+                const now = Date.now();
+                if (progress > 0 && progress < 1 && now - lastProgressAt < PROGRESS_BAR_THROTTLE_MS) return;
+                lastProgressAt = now;
+                sendProgressBarChange(window, name, progress * 100, undefined, nonce);
+            }, { force: true });
+            if (status !== 'error') status = 'updated';
+        } catch (error) {
+            eventsLogger.error('Component update failed', name, error);
+            status = 'error';
+        } finally {
+            if (nonce) sendBasicToastDismiss(window, name, nonce);
+        }
+    }
+    return status;
+}
+
 const sendRefreshApplicationData = (window) => {
     sendToApplicationRenderer(window, IpcChannel.REFRESH_APPLICATION_DATA);
     eventsLogger.info('Event sent', IpcChannel.REFRESH_APPLICATION_DATA);

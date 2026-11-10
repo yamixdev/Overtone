@@ -156,7 +156,7 @@ class FfmpegUpdater {
      * - бинарник существует
      * - при requireHash=true совпадает SHA-256
      */
-    async isInstalled() {
+    async isInstalled({ verifyLatest = false } = {}) {
         if (!(await this.fileExists(this.installPath))) {
             return false;
         }
@@ -167,6 +167,7 @@ class FfmpegUpdater {
 
         const expected = await this.fetchExpectedHash();
         if (!expected) {
+            if (verifyLatest) throw new Error('FFmpeg checksum unavailable');
             return true;
         }
 
@@ -241,11 +242,17 @@ class FfmpegUpdater {
         if (!(await this.fileExists(src))) {
             throw new Error('Extracted ffmpeg binary not found');
         }
-
-        await fsPromise.copyFile(src, this.installPath);
-        if (process.platform !== 'win32') {
-            await fsPromise.chmod(this.installPath, 0o755);
+        if (this.requireHash) {
+            const expected = await this.fetchExpectedHash();
+            if (!expected || (await sha256File(src)) !== expected) {
+                throw new Error('Could not verify FFmpeg SHA-256');
+            }
         }
+
+        if (process.platform !== 'win32') {
+            await fsPromise.chmod(src, 0o755);
+        }
+        await fsPromise.rename(src, this.installPath);
     }
 
     /**
@@ -254,7 +261,16 @@ class FfmpegUpdater {
      *
      * Добавлено: очистка кеша после успешной установки (и best-effort при ошибках).
      */
-    async ensureInstalled(callback, { force = false } = {}) {
+    ensureInstalled(callback, { force = false } = {}) {
+        if (!this.installing) {
+            this.installing = this.installIfNeeded(callback, force).finally(() => {
+                this.installing = null;
+            });
+        }
+        return this.installing;
+    }
+
+    async installIfNeeded(callback, force) {
         if (!force) {
             if (this.isInstalledValidated && (await this.fileExists(this.installPath))) {
                 this.logger.log('FFmpeg already installed (cached validation)');
@@ -277,20 +293,6 @@ class FfmpegUpdater {
 
             await this.extract();
             await this.install();
-
-            if (this.requireHash) {
-                const expected = await this.fetchExpectedHash();
-                if (!expected) {
-                    await this.deleteFileIfExists(this.installPath);
-                    throw new Error('Expected SHA-256 unavailable');
-                }
-
-                const actual = await sha256File(this.installPath);
-                if (actual !== expected) {
-                    await this.deleteFileIfExists(this.installPath);
-                    throw new Error('SHA-256 mismatch');
-                }
-            }
 
             // ✅ Очистка кеша после успешной установки
             await this.clearCache();

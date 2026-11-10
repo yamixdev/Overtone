@@ -13,6 +13,7 @@ const { config } = require('../config.js');
 const { Logger } = require('../packages/logger/Logger.js');
 const { state } = require('./state.js');
 const { getUpdateChannel } = require('./updateChannel.js');
+const { getModSettings } = require('./store.js');
 
 const RELEASE_API = 'https://api.github.com/repos/yamixdev/Overtone/releases';
 const RELEASE_PATH = '/yamixdev/Overtone/releases/download/';
@@ -87,6 +88,13 @@ async function downloadInstaller(asset, target, progress) {
     if (bytes !== asset.size || hash.digest('hex') !== asset.digest) throw new Error('Overtone update SHA-256 mismatch');
 }
 
+async function verifyInstaller(installer, asset) {
+    if ((await fsp.stat(installer)).size !== asset.size) throw new Error('Overtone installer size mismatch');
+    const hash = createHash('sha256');
+    for await (const chunk of fs.createReadStream(installer)) hash.update(chunk);
+    if (hash.digest('hex') !== asset.digest) throw new Error('Overtone installer SHA-256 mismatch');
+}
+
 class ModUpdater {
     logger = new Logger('OvertoneUpdater');
     listeners = [];
@@ -97,6 +105,67 @@ class ModUpdater {
     checking = false;
     downloading = false;
     installing = false;
+    clearing = false;
+    progress = -100;
+
+    get cacheDir() {
+        return path.join(app.getPath('userData'), 'overtone-updates');
+    }
+
+    get pendingFile() {
+        return path.join(this.cacheDir, 'pending.json');
+    }
+
+    async restore() {
+        if (!this.isEnabled() || this.portable) return false;
+        try {
+            const saved = JSON.parse(await fsp.readFile(this.pendingFile, 'utf8'));
+            const version = INSTALLER_NAME.exec(saved?.name ?? '')?.[1];
+            const channel = getUpdateChannel();
+            const asset = readAsset({ ...saved, state: 'uploaded', browser_download_url: saved?.url, digest: `sha256:${saved?.digest}` });
+            if (!asset || saved.channel !== channel || semver.valid(version) !== version || !semver.gt(version, CURRENT_VERSION)) return false;
+            if (Boolean(semver.prerelease(version)) !== (channel === 'overtone-beta')) return false;
+            const installer = path.join(this.cacheDir, asset.name);
+            await verifyInstaller(installer, asset);
+            if (getUpdateChannel() !== channel) return false;
+            this.available = { ...asset, version, channel, portable: false };
+            this.downloaded = { path: installer, asset: this.available };
+            this.progress = 110;
+            return getModSettings()?.appAutoUpdates?.installDownloadedOnStartup === true && (await this.onInstallUpdate());
+        } catch (error) {
+            if (error.code !== 'ENOENT') this.logger.warn('Could not restore the downloaded Overtone update:', error);
+            return false;
+        }
+    }
+
+    announce(allowAutoDownload = false) {
+        const asset = this.available;
+        if (!this.isEnabled() || asset?.channel !== getUpdateChannel()) return;
+        for (const listener of this.listeners) listener(CURRENT_VERSION, asset.version, asset.portable, this.progress, allowAutoDownload);
+    }
+
+    async clearCache() {
+        if (this.downloading || this.installing || this.checking || this.clearing) return 'busy';
+        this.clearing = true;
+        try {
+            const files = await fsp.readdir(this.cacheDir, { withFileTypes: true }).catch((error) => {
+                if (error.code === 'ENOENT') return [];
+                throw error;
+            });
+            for (const file of files) {
+                const partialBase = file.name.replace(/\.[a-f0-9-]{36}\.part$/i, '');
+                if (file.isFile() && (partialBase === 'pending.json' || INSTALLER_NAME.test(partialBase))) {
+                    await fsp.rm(path.join(this.cacheDir, file.name), { force: true });
+                }
+            }
+            return 'cleared';
+        } finally {
+            this.downloaded = null;
+            this.progress = -100;
+            this.clearing = false;
+            this.announce();
+        }
+    }
 
     isEnabled() {
         return app.isPackaged && process.platform === 'win32' && process.arch === 'x64' && ['overtone', 'overtone-beta'].includes(getUpdateChannel());
@@ -113,8 +182,9 @@ class ModUpdater {
         this.interval.unref();
     }
 
-    async check() {
-        if (!this.isEnabled() || this.checking || this.downloading || this.installing) return;
+    async check({ manual = false } = {}) {
+        if (!this.isEnabled()) return 'disabled';
+        if (this.checking || this.downloading || this.installing || this.clearing) return 'busy';
         this.checking = true;
         try {
             const channel = getUpdateChannel();
@@ -128,64 +198,92 @@ class ModUpdater {
             const candidate = beta
                 ? selectOvertoneBetaRelease(releases, CURRENT_VERSION, this.portable)
                 : selectOvertoneRelease(releases, CURRENT_VERSION, this.portable);
-            if (getUpdateChannel() !== channel || this.downloading || this.installing) return;
+            if (getUpdateChannel() !== channel || this.downloading || this.installing) return 'busy';
             const previous = this.available;
-            if (candidate && channel === previous?.channel && candidate.version === previous.version && candidate.digest === previous.digest) return;
-            this.available = candidate && { ...candidate, channel };
-            if (this.downloaded) await fsp.rm(this.downloaded.path, { force: true }).catch(() => {});
+            if (candidate && channel === previous?.channel && candidate.version === previous.version && candidate.digest === previous.digest) {
+                const autoDownload = !this.downloaded && !this.portable && getModSettings()?.appAutoUpdates?.autoDownload === true;
+                if (manual || autoDownload) this.announce(autoDownload);
+                return 'available';
+            }
+            this.available = null;
+            if (this.downloaded) {
+                await fsp.rm(this.pendingFile, { force: true }).catch(() => {});
+                await fsp.rm(this.downloaded.path, { force: true }).catch(() => {});
+            }
             this.downloaded = null;
-            if (!candidate || getUpdateChannel() !== channel) return;
-            for (const listener of this.listeners) listener(CURRENT_VERSION, candidate.version, candidate.portable);
+            this.progress = -100;
+            if (getUpdateChannel() !== channel) return 'busy';
+            if (!candidate) {
+                if (previous) {
+                    for (const listener of this.listeners) listener(CURRENT_VERSION, null, this.portable, this.progress, false);
+                }
+                return 'current';
+            }
+            this.available = { ...candidate, channel };
+            this.announce(true);
+            return 'available';
         } catch (error) {
             this.logger.warn('Overtone update check failed:', error);
+            return 'error';
         } finally {
             this.checking = false;
         }
     }
 
-    async onUpdateDownload(progress) {
+    async onUpdateDownload(onProgress) {
         const candidate = this.available;
-        if (!this.isEnabled() || candidate?.channel !== getUpdateChannel() || this.downloading || this.installing) return;
+        if (!this.isEnabled() || candidate?.channel !== getUpdateChannel() || this.downloading || this.installing || this.clearing) return false;
         if (candidate.portable) {
-            await shell.openExternal(candidate.url).catch((error) => this.logger.warn('Could not open Overtone ZIP:', error));
-            return;
+            try {
+                await shell.openExternal(candidate.url);
+                return true;
+            } catch (error) {
+                this.logger.warn('Could not open Overtone ZIP:', error);
+                return false;
+            }
         }
+        const progress = (fraction, windowProgress) => {
+            this.progress = fraction * 100;
+            onProgress(fraction, windowProgress);
+        };
         if (this.downloaded?.asset === candidate) {
             progress(1.1, -1);
-            return;
+            return true;
         }
 
         this.downloading = true;
-        const folder = path.join(app.getPath('userData'), 'overtone-updates');
-        const target = path.join(folder, candidate.name);
+        const target = path.join(this.cacheDir, candidate.name);
         const partial = `${target}.${randomUUID()}.part`;
+        const pendingPartial = `${this.pendingFile}.${randomUUID()}.part`;
         try {
-            await fsp.mkdir(folder, { recursive: true });
+            progress(-2, -1);
+            await fsp.mkdir(this.cacheDir, { recursive: true });
             await downloadInstaller(candidate, partial, progress);
             if (getUpdateChannel() !== candidate.channel || this.available !== candidate) throw new Error('Overtone update channel changed');
             await fsp.rename(partial, target);
+            await fsp.writeFile(pendingPartial, JSON.stringify(candidate), { flag: 'wx' });
+            await fsp.rename(pendingPartial, this.pendingFile);
             this.downloaded = { path: target, asset: candidate };
             progress(1.1, -1);
+            return true;
         } catch (error) {
             this.logger.warn('Overtone update download failed:', error);
             progress(-1, -1);
+            return false;
         } finally {
-            this.downloading = false;
             await fsp.rm(partial, { force: true }).catch(() => {});
+            await fsp.rm(pendingPartial, { force: true }).catch(() => {});
+            this.downloading = false;
         }
     }
 
     async onInstallUpdate() {
-        if (!this.isEnabled() || this.portable || this.installing || this.downloaded?.asset.channel !== getUpdateChannel() || !fs.existsSync(this.installerMarker))
+        if (!this.isEnabled() || this.portable || this.installing || this.clearing || this.downloaded?.asset.channel !== getUpdateChannel() || !fs.existsSync(this.installerMarker))
             return false;
         this.installing = true;
         const { path: installer, asset } = this.downloaded;
         try {
-            const stat = await fsp.stat(installer);
-            if (stat.size !== asset.size) throw new Error('Overtone installer size mismatch');
-            const hash = createHash('sha256');
-            for await (const chunk of fs.createReadStream(installer)) hash.update(chunk);
-            if (hash.digest('hex') !== asset.digest) throw new Error('Overtone installer SHA-256 mismatch');
+            await verifyInstaller(installer, asset);
             if (getUpdateChannel() !== asset.channel || this.available !== asset) return false;
 
             const directory = path.dirname(process.resourcesPath);
@@ -199,12 +297,15 @@ class ModUpdater {
                 child.once('error', reject);
             });
             child.unref();
+            await fsp.rm(this.pendingFile, { force: true }).catch(() => {});
             state.willQuit = true;
             app.quit();
             return true;
         } catch (error) {
             this.logger.error('Overtone update could not be installed:', error);
             this.downloaded = null;
+            this.progress = -100;
+            await fsp.rm(this.pendingFile, { force: true }).catch(() => {});
             return false;
         } finally {
             this.installing = false;

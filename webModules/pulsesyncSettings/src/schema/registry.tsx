@@ -4,8 +4,9 @@ import { AudioSettings } from '../features/audio/AudioSettings';
 import { GlobalShortcutsSettings } from '../features/global-shortcuts/GlobalShortcutsSettings';
 import { LastFmSettings } from '../features/lastfm/LastFmSettings';
 import { LocalAddonsSettings } from '../features/local-addons/LocalAddonsSettings';
+import { UpdatesSettings } from '../features/updates/UpdatesSettings';
 import { SchemaSettingsSection } from './SchemaSettingsSection';
-import { appSectionsSchema, appUpdatesSchema, downloaderSchema, playlistSchema } from './sections/general';
+import { appSectionsSchema, downloaderSchema, playlistSchema } from './sections/general';
 import { crossfadeSchema } from './sections/crossfade';
 import { discordRpcSchema, lrclibSchema } from './sections/integrations';
 import { miniplayerSchema, modAppearanceSchema, playerBarSchema, windowSchema } from './sections/interface';
@@ -93,7 +94,7 @@ export const SETTINGS_GROUPS = [
             )),
             schemaSection('crossfade', 'Кроссфейд', crossfadeSchema),
             schemaSection('ynison', 'Ynison Remote', ynisonSchema),
-            schemaSection('updates', 'Обновления', appUpdatesSchema),
+            customSection('updates', 'Обновления', (props) => <UpdatesSettings {...props} />),
         ],
     },
 ] as const;

@@ -101,6 +101,7 @@ class YtDlpInstaller {
             const response = await axios.get(this.getShaUrl(), {
                 httpsAgent: agent,
                 responseType: 'text',
+                timeout: 8000,
                 headers: { 'User-Agent': 'PulseSync-yt-dlp-installer' },
                 validateStatus: (status) => status === 200 || status === 404,
             });
@@ -124,13 +125,14 @@ class YtDlpInstaller {
         return await this.fileExists(this.installPath);
     }
 
-    async isInstalled() {
+    async isInstalled({ verifyLatest = false } = {}) {
         if (!(await this.hasInstalledBinary())) {
             return false;
         }
 
         const expectedHash = await this.fetchExpectedHash();
         if (!expectedHash) {
+            if (verifyLatest) throw new Error('yt-dlp checksum unavailable');
             return true;
         }
 
@@ -172,30 +174,33 @@ class YtDlpInstaller {
 
     async install() {
         await fsPromise.mkdir(path.dirname(this.installPath), { recursive: true });
-        await fsPromise.copyFile(this.archivePath, this.installPath);
-
         if (process.platform !== 'win32') {
-            await fsPromise.chmod(this.installPath, 0o755);
+            await fsPromise.chmod(this.archivePath, 0o755);
         }
+        await fsPromise.rename(this.archivePath, this.installPath);
     }
 
-    async ensureInstalled(callback, { force = false } = {}) {
+    ensureInstalled(callback, { force = false } = {}) {
+        if (!this.installing) {
+            this.installing = this.installIfNeeded(callback, force).finally(() => {
+                this.installing = null;
+            });
+        }
+        return this.installing;
+    }
+
+    async installIfNeeded(callback, force) {
         if (!force && (await this.isInstalled())) {
             return this.installPath;
         }
 
         try {
             await this.download(callback);
-            await this.install();
-
             const expectedHash = await this.fetchExpectedHash();
-            if (expectedHash) {
-                const actualHash = await sha256File(this.installPath);
-                if (actualHash.toLowerCase() !== expectedHash) {
-                    await this.deleteFileIfExists(this.installPath);
-                    throw new Error('yt-dlp checksum mismatch');
-                }
+            if (!expectedHash || (await sha256File(this.archivePath)) !== expectedHash) {
+                throw new Error('Could not verify yt-dlp SHA-256');
             }
+            await this.install();
 
             return this.installPath;
         } finally {

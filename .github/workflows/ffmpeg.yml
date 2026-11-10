@@ -1,148 +1,51 @@
-name: Download FFmpeg binaries (manual)
+name: Mirror FFmpeg binaries (manual)
 
 on:
     workflow_dispatch:
         inputs:
             ffmpeg_version:
-                description: 'FFmpeg version from ffmpeg-static releases (e.g. 7.1.1, 8.0.1)'
-                required: false
-                default: '6.1.1'
+                description: 'Exact FFmpeg version currently published by foreA-adoxid/ffmpeg-builds'
+                type: string
+                default: '9.0.2'
+                required: true
 
 concurrency:
-    group: ffmpeg-download-${{ github.ref }}
-    cancel-in-progress: true
+    group: ffmpeg-binaries
+    cancel-in-progress: false
 
 permissions:
     contents: write
 
 jobs:
-    download:
-        name: ${{ matrix.name }}
-        strategy:
-            fail-fast: false
-            matrix:
-                include:
-                    - name: linux-x86_64
-                      runner: ubuntu-latest
-                      target: linux
-                      arch: x86_64
-                      ffmpeg_static_name: linux-x64
-
-                    - name: macos-x86_64
-                      runner: macos-15-intel
-                      target: macos
-                      arch: x86_64
-                      ffmpeg_static_name: darwin-x64
-
-                    - name: macos-arm64
-                      runner: macos-latest
-                      target: macos
-                      arch: arm64
-                      ffmpeg_static_name: darwin-arm64
-
-                    - name: windows-x86_64
-                      runner: ubuntu-latest
-                      target: windows
-                      arch: x86_64
-                      ffmpeg_static_name: win32-x64
-
-        runs-on: ${{ matrix.runner }}
-
-        steps:
-            - name: Checkout
-              uses: actions/checkout@v7.0.1
-
-            - name: Download FFmpeg binary from ffmpeg-static
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  mkdir -p dist/bin
-
-                  FFMPEG_VERSION="${{ inputs.ffmpeg_version }}"
-                  FFMPEG_STATIC_NAME="${{ matrix.ffmpeg_static_name }}"
-
-                  # Construct the download URL
-                  # ffmpeg-static format: https://github.com/eugeneware/ffmpeg-static/releases/download/b{version}/ffmpeg-{name}
-                  DOWNLOAD_URL="https://github.com/eugeneware/ffmpeg-static/releases/download/b${FFMPEG_VERSION}/ffmpeg-${FFMPEG_STATIC_NAME}"
-
-                  if [ "${{ matrix.target }}" = "windows" ]; then
-                    BIN_PATH="dist/bin/ffmpeg.exe"
-                  else
-                    BIN_PATH="dist/bin/ffmpeg"
-                  fi
-
-                  echo "Downloading from: ${DOWNLOAD_URL}"
-                  curl -L --retry 5 --retry-delay 2 -o "${BIN_PATH}" "${DOWNLOAD_URL}"
-
-                  # Make executable (non-Windows)
-                  if [ "${{ matrix.target }}" != "windows" ]; then
-                    chmod +x "${BIN_PATH}"
-                  fi
-
-                  echo "Downloaded: ${BIN_PATH}"
-                  file "${BIN_PATH}" || true
-
-            - name: Package artifact (tar.gz only ffmpeg binary) + sha256 of binary
-              shell: bash
-              run: |
-                  set -euo pipefail
-                  ARTIFACT="ffmpeg-${{ matrix.target }}-${{ matrix.arch }}"
-                  mkdir -p out
-
-                  if [ "${{ matrix.target }}" = "windows" ]; then
-                    BIN="dist/bin/ffmpeg.exe"
-                  else
-                    BIN="dist/bin/ffmpeg"
-                  fi
-
-                  if [ ! -f "${BIN}" ]; then
-                    echo "Expected binary not found: ${BIN}"
-                    echo "dist tree:"
-                    find dist -maxdepth 3 -type f -print
-                    exit 1
-                  fi
-
-                  TAR_PATH="out/${ARTIFACT}.tar.gz"
-                  SHA_PATH="out/${ARTIFACT}.sha256"
-
-                  # 1) sha256 of the binary itself (this is what your updater wants)
-                  if command -v sha256sum >/dev/null 2>&1; then
-                    sha256sum "${BIN}" | awk '{print $1}' > "${SHA_PATH}"
-                  else
-                    shasum -a 256 "${BIN}" | awk '{print $1}' > "${SHA_PATH}"
-                  fi
-
-                  # 2) tar.gz only the ffmpeg binary (no paths)
-                  # Use -C to avoid embedding dist/bin path in the archive
-                  tar -C "$(dirname "${BIN}")" -czf "${TAR_PATH}" "$(basename "${BIN}")"
-
-                  echo "Created ${TAR_PATH}"
-                  echo "Created ${SHA_PATH} (sha256 of binary)"
-                  ls -la out
-
-            - name: Upload artifact
-              uses: actions/upload-artifact@v7.0.2
-              with:
-                  name: ffmpeg-${{ matrix.target }}-${{ matrix.arch }}
-                  path: out/*
-                  if-no-files-found: error
-
-    release:
-        name: Publish release assets
-        needs: download
+    mirror:
         runs-on: ubuntu-latest
-
+        env:
+            GH_TOKEN: ${{ github.token }}
+            FFMPEG_VERSION: ${{ inputs.ffmpeg_version }}
         steps:
-            - uses: actions/download-artifact@v8.0.1
-
-            - name: Create / update release
-              uses: softprops/action-gh-release@v3.0.3
+            - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
               with:
-                  tag_name: ffmpeg-binaries
-                  name: FFmpeg prebuilt binaries
-                  prerelease: false
-                  make_latest: false
-                  fail_on_unmatched_files: true
-                  files: |
-                      ffmpeg-*/ffmpeg-*.tar.gz
-                      ffmpeg-*/ffmpeg-*.sha256
+                  persist-credentials: false
+
+            - name: Download and verify FFmpeg binaries and sources
+              shell: pwsh
+              run: |
+                  ./toolset/ci/prepare-ffmpeg-assets.ps1 -Version $env:FFMPEG_VERSION -OutputDirectory (Join-Path $env:RUNNER_TEMP 'ffmpeg-assets')
+
+            - name: Create the FFmpeg component release
+              shell: pwsh
+              run: |
+                  gh release view ffmpeg-binaries --repo $env:GITHUB_REPOSITORY --json tagName 2>$null
+                  if ($LASTEXITCODE -eq 0) { throw 'The FFmpeg release already exists. Verify existing assets before replacing them.' }
+
+                  $assets = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'ffmpeg-assets') -File | Select-Object -ExpandProperty FullName)
+                  $notes = Join-Path $env:RUNNER_TEMP 'ffmpeg-notes.md'
+                  @(
+                    "FFmpeg $env:FFMPEG_VERSION binaries and corresponding source archives."
+                    ''
+                    'Mirrored from [foreA-adoxid/ffmpeg-builds](https://github.com/foreA-adoxid/ffmpeg-builds/releases/tag/ffmpeg-binaries).'
+                    ''
+                    'The .sha256 files contain hashes of the executables.'
+                  ) | Set-Content -LiteralPath $notes -Encoding utf8
+                  gh release create ffmpeg-binaries @assets --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "FFmpeg $env:FFMPEG_VERSION binaries" --notes-file $notes --latest=false
+                  if ($LASTEXITCODE -ne 0) { throw 'Could not create the FFmpeg release.' }

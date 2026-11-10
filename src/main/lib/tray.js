@@ -64,8 +64,8 @@ const createContextMenu = (window) => {
             label: (0, formatters_js_1.formatMessage)({ id: 'desktop.check-for-updates' }),
             enabled: getUpdateChannel() !== 'off',
             click() {
-                if (getUpdateChannel() === 'overtone') void modUpdater.check();
-                else void updater.check();
+                if (getUpdateChannel() === 'yandex') void updater.check();
+                else void modUpdater.check();
             },
         },
         {

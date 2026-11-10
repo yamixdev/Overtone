@@ -10,7 +10,10 @@ function getUpdateChannel() {
     if (channel === undefined && (get('modSettings.appAutoUpdates.enableAppAutoUpdate') === false || get(StoreKeys.AUTO_UPDATES) === false)) {
         return 'off';
     }
-    return process.platform === 'win32' && process.arch === 'x64' ? 'overtone' : 'off';
+    if (process.platform !== 'win32' || process.arch !== 'x64') return 'off';
+    if (channel === 'overtone-beta') return channel;
+    if (channel === undefined && /-beta\.\d+$/.test(require('../config.js').config.modification.version)) return 'overtone-beta';
+    return 'overtone';
 }
 
 module.exports = { getUpdateChannel };

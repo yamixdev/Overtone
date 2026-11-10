@@ -4,9 +4,16 @@ on:
     workflow_dispatch:
         inputs:
             mod_version:
-                description: Overtone version (defaults to the version in package.json)
+                description: Overtone version (X.Y.Z or X.Y.Z-beta.N)
                 type: string
                 required: false
+            ffmpeg_source:
+                description: GitHub source for the optional FFmpeg executable
+                type: choice
+                default: overtone
+                options:
+                    - overtone
+                    - upstream
             smoke_test:
                 description: Launch Electron on the runner to check startup
                 type: boolean
@@ -22,7 +29,6 @@ jobs:
         timeout-minutes: 60
         env:
             NO_COLOR: 1
-            ELECTRON_SKIP_BINARY_DOWNLOAD: 1
 
         steps:
             - name: Checkout selected commit
@@ -71,6 +77,7 @@ jobs:
               id: build
               env:
                   OVERTONE_BUILD_VERSION: ${{ inputs.mod_version }}
+                  OVERTONE_FFMPEG_SOURCE: ${{ inputs.ffmpeg_source }}
                   OVERTONE_ELECTRON_SMOKE_TEST: ${{ inputs.smoke_test }}
               run: node toolset/ci/build-mod-draft.js
 
@@ -109,6 +116,7 @@ jobs:
                   GH_TOKEN: ${{ github.token }}
                   DRAFT_TAG: ${{ steps.build.outputs.tag }}
                   DRAFT_TITLE: ${{ steps.build.outputs.title }}
+                  DRAFT_PRERELEASE: ${{ steps.build.outputs.prerelease }}
                   BUILD_SHA: ${{ steps.build.outputs.commit }}
                   ZIP_PATH: ${{ steps.build.outputs.zip }}
                   CHECKSUM_PATH: ${{ steps.build.outputs.checksum }}
@@ -119,7 +127,9 @@ jobs:
                   INSTALLER_ARTIFACT_URL: ${{ steps.installer_artifact.outputs.artifact-url }}
                   CHECKSUM_ARTIFACT_URL: ${{ steps.checksum_artifact.outputs.artifact-url }}
               run: |
-                  $releaseUrl = gh release create $env:DRAFT_TAG $env:ZIP_PATH $env:CHECKSUM_PATH $env:INSTALLER_PATH $env:INSTALLER_CHECKSUM_PATH --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --draft --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH
+                  $releaseFlags = @('--draft')
+                  if ($env:DRAFT_PRERELEASE -eq 'true') { $releaseFlags += @('--prerelease', '--latest=false') }
+                  $releaseUrl = gh release create $env:DRAFT_TAG $env:ZIP_PATH $env:CHECKSUM_PATH $env:INSTALLER_PATH $env:INSTALLER_CHECKSUM_PATH --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH @releaseFlags
                   if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
                   "[Черновик GitHub Release]($releaseUrl)" >> $env:GITHUB_STEP_SUMMARY
                   "[Скачать ZIP из GitHub Actions]($env:PORTABLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY

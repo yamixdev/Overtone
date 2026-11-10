@@ -8,6 +8,7 @@ global.requireIfExists = (path) => {
     }
 };
 const electron_1 = require('electron');
+const { config } = require('./config.js');
 const platform_js_1 = require('./types/platform.js');
 const Logger_js_1 = require('./packages/logger/Logger.js');
 const systemMenu_js_1 = require('./lib/systemMenu.js');
@@ -88,7 +89,7 @@ const MiniPlayer = miniPlayer_js_1.getMiniPlayer();
     const updater = (0, updater_js_1.getUpdater)();
     const modUpdater = (0, modUpdater_js_1.getModUpdater)();
     const ffmpegInstaller = getFfmpegUpdater({
-        repo: 'foreA-adoxid/ffmpeg-builds',
+        repo: config.app.ffmpegRepository ?? 'yamixdev/Overtone',
         tagName: 'ffmpeg-binaries',
     });
     getYtDlpInstaller();

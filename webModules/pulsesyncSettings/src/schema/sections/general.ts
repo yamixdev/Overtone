@@ -140,6 +140,11 @@ export const appUpdatesSchema = defineSettingsSection({
                               label: 'Overtone',
                               description: 'Новые сборки с модом. Для portable доступно скачивание ZIP.',
                           },
+                          {
+                              value: 'overtone-beta',
+                              label: 'Overtone Beta',
+                              description: 'Ранние сборки Overtone из раздела Pre-release на GitHub.',
+                          },
                       ]
                     : []),
                 {

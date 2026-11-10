@@ -9,6 +9,8 @@ const electron = require('electron');
 const crypto = require('crypto');
 const { pipeline } = require('stream/promises');
 const Logger_js_1 = require('../packages/logger/Logger.js');
+const { downloadFileWithProgress } = require('./utils.js');
+const { queueComponentInstall } = require('./componentInstall.js');
 
 function getBaseDirNearAsar() {
     const appPath = electron.app.getAppPath();
@@ -125,51 +127,13 @@ class YtDlpInstaller {
         return await this.fileExists(this.installPath);
     }
 
-    async isInstalled({ verifyLatest = false } = {}) {
-        if (!(await this.hasInstalledBinary())) {
-            return false;
-        }
-
-        const expectedHash = await this.fetchExpectedHash();
-        if (!expectedHash) {
-            if (verifyLatest) throw new Error('yt-dlp checksum unavailable');
-            return true;
-        }
-
-        const actualHash = await sha256File(this.installPath);
-        return actualHash.toLowerCase() === expectedHash;
-    }
-
     async download(callback) {
         await fsPromise.mkdir(path.dirname(this.archivePath), { recursive: true });
         await this.deleteFileIfExists(this.archivePath);
-
-        const agent = new https.Agent({ keepAlive: true });
-        const response = await axios.get(this.getAssetUrl(), {
-            responseType: 'stream',
-            httpsAgent: agent,
-            headers: { 'User-Agent': 'PulseSync-yt-dlp-installer' },
-            maxRedirects: 10,
-            validateStatus: (status) => status >= 200 && status < 400,
+        callback?.(0, 0);
+        await downloadFileWithProgress(this.getAssetUrl(), this.archivePath, (progress) => callback?.(progress, progress), undefined, {
+            signal: AbortSignal.timeout(10 * 60_000),
         });
-
-        const totalLength = parseInt(response.headers['content-length'] || '0', 10);
-        let downloaded = 0;
-
-        response.data.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (typeof callback === 'function' && totalLength > 0) {
-                const progress = downloaded / totalLength;
-                callback(progress, progress);
-            }
-        });
-
-        try {
-            await pipeline(response.data, fs.createWriteStream(this.archivePath));
-        } catch (error) {
-            await this.deleteFileIfExists(this.archivePath);
-            throw error;
-        }
     }
 
     async install() {
@@ -180,29 +144,30 @@ class YtDlpInstaller {
         await fsPromise.rename(this.archivePath, this.installPath);
     }
 
-    ensureInstalled(callback, { force = false } = {}) {
-        if (!this.installing) {
-            this.installing = this.installIfNeeded(callback, force).finally(() => {
-                this.installing = null;
-            });
-        }
-        return this.installing;
+    ensureInstalled(callback) {
+        return queueComponentInstall(this, () => this.installIfNeeded(callback, false)).then(() => this.installPath);
     }
 
-    async installIfNeeded(callback, force) {
-        if (!force && (await this.isInstalled())) {
-            return this.installPath;
+    updateIfNeeded(callback) {
+        return queueComponentInstall(this, () => this.installIfNeeded(callback, true), true);
+    }
+
+    async installIfNeeded(callback, verifyLatest) {
+        const exists = await this.hasInstalledBinary();
+        const expectedHash = await this.fetchExpectedHash();
+        if (!expectedHash) {
+            if (exists && !verifyLatest) return false;
+            throw new Error('yt-dlp checksum unavailable');
         }
+        if (exists && (await sha256File(this.installPath)) === expectedHash) return false;
 
         try {
             await this.download(callback);
-            const expectedHash = await this.fetchExpectedHash();
-            if (!expectedHash || (await sha256File(this.archivePath)) !== expectedHash) {
+            if ((await sha256File(this.archivePath)) !== expectedHash) {
                 throw new Error('Could not verify yt-dlp SHA-256');
             }
             await this.install();
-
-            return this.installPath;
+            return true;
         } finally {
             await this.deleteFileIfExists(this.archivePath);
         }

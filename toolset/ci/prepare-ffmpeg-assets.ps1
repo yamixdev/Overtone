@@ -36,4 +36,20 @@ foreach ($name in $names) {
     $actual = (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash
     if ($actual -ne $asset[0].digest.Substring(7)) { throw "SHA-256 mismatch for $name." }
 }
+foreach ($platform in @('windows-x86_64', 'linux-x86_64', 'macos-x86_64', 'macos-arm64')) {
+    $binary = if ($platform.StartsWith('windows-')) { 'ffmpeg.exe' } else { 'ffmpeg' }
+    $archive = Join-Path $OutputDirectory "ffmpeg-$platform.tar.gz"
+    $entries = @(tar -tf $archive | Where-Object { $_ -ceq $binary -or $_ -ceq "./$binary" })
+    if ($LASTEXITCODE -ne 0 -or $entries.Count -ne 1) { throw "Invalid FFmpeg archive for $platform." }
+    $expected = (Get-Content -LiteralPath (Join-Path $OutputDirectory "ffmpeg-$platform.sha256") -Raw).Trim()
+    $tempFile = [IO.Path]::GetTempFileName()
+    try {
+        tar -xOf $archive -- $entries[0] > $tempFile
+        if ($LASTEXITCODE -ne 0 -or $expected -notmatch '^[a-f0-9]{64}$' -or (Get-FileHash -LiteralPath $tempFile).Hash -ne $expected) {
+            throw "The executable and its checksum do not match for $platform."
+        }
+    } finally {
+        Remove-Item -LiteralPath $tempFile
+    }
+}
 Write-Host "Verified $($names.Count) FFmpeg $Version assets, including corresponding sources."

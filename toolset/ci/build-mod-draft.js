@@ -5,6 +5,7 @@ const { execFileSync, spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const { setTimeout: delay } = require('node:timers/promises');
 const { createToolsetCore } = require('../core.js');
+const { OVERTONE_FFMPEG_REPOSITORY, FFMPEG_CHANNEL_TAG, readFfmpegRelease, resolveFfmpegTag } = require('../../src/main/lib/ffmpegRelease.js');
 const { appExecutableName, electronVersion, packageWindowsClient } = require('./package-windows-client.js');
 
 function readManifest(asar, archive) {
@@ -100,16 +101,12 @@ async function getFfmpegRepository(source) {
     if (source === 'upstream') return 'foreA-adoxid/ffmpeg-builds';
     if (source !== 'overtone') throw new Error('Выберите источник FFmpeg upstream или overtone.');
 
-    const repo = 'yamixdev/Overtone';
-    const release = await fetch(`https://api.github.com/repos/${repo}/releases/tags/ffmpeg-binaries`, {
-        headers: { Accept: 'application/vnd.github+json' },
-        signal: AbortSignal.timeout(15_000),
-    });
-    if (!release.ok) throw new Error(`Сначала подготовьте релиз ffmpeg-binaries в ${repo} (HTTP ${release.status}).`);
-    const { assets } = await release.json();
+    const repo = OVERTONE_FFMPEG_REPOSITORY;
+    const tag = await resolveFfmpegTag(repo, FFMPEG_CHANNEL_TAG);
+    const { assets } = await readFfmpegRelease(repo, tag);
     for (const name of ['ffmpeg-windows-x86_64.tar.gz', 'ffmpeg-windows-x86_64.sha256']) {
         if (!assets?.some((asset) => asset.name === name && asset.state === 'uploaded')) {
-            throw new Error(`В релизе ffmpeg-binaries отсутствует ${name}.`);
+            throw new Error(`В релизе ${tag} отсутствует ${name}.`);
         }
     }
     return repo;

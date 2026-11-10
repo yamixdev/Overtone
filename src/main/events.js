@@ -1109,7 +1109,11 @@ const handleApplicationEvents = (window) => {
                 let message;
                 try {
                     const result = await modUpdater_js_1.getModUpdater().clearCache();
-                    message = result === 'cleared' ? 'Скачанные пакеты Overtone удалены' : 'Дождитесь завершения обновления клиента';
+                    message = {
+                        cleared: 'Кэш обновлений очищен',
+                        empty: 'Нет скачанных обновлений',
+                        busy: 'Дождитесь завершения обновления клиента',
+                    }[result];
                 } catch (error) {
                     eventsLogger.error('Could not clear Overtone updates', error);
                     message = 'Не удалось удалить скачанные обновления';
@@ -1375,17 +1379,16 @@ async function updateComponents(window) {
         let nonce;
         try {
             if (name === 'yt-dlp' && !(await installer.hasInstalledBinary())) continue;
-            if (await installer.isInstalled({ verifyLatest: true })) continue;
-            nonce = sendBasicToastCreate(window, name, 'Обновление компонента: ' + name, false);
             let lastProgressAt = 0;
-            await installer.ensureInstalled((progress) => {
+            const updated = await installer.updateIfNeeded((progress) => {
                 if (window.isDestroyed()) return;
+                nonce ??= sendBasicToastCreate(window, name, 'Обновление компонента: ' + name, false);
                 const now = Date.now();
                 if (progress > 0 && progress < 1 && now - lastProgressAt < PROGRESS_BAR_THROTTLE_MS) return;
                 lastProgressAt = now;
                 sendProgressBarChange(window, name, progress * 100, undefined, nonce);
-            }, { force: true });
-            if (status !== 'error') status = 'updated';
+            });
+            if (updated && status !== 'error') status = 'updated';
         } catch (error) {
             eventsLogger.error('Component update failed', name, error);
             status = 'error';

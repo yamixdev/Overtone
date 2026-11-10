@@ -32,20 +32,7 @@ jobs:
               run: |
                   ./toolset/ci/prepare-ffmpeg-assets.ps1 -Version $env:FFMPEG_VERSION -OutputDirectory (Join-Path $env:RUNNER_TEMP 'ffmpeg-assets')
 
-            - name: Create the FFmpeg component release
+            - name: Publish the verified version and update the FFmpeg channel
               shell: pwsh
               run: |
-                  gh release view ffmpeg-binaries --repo $env:GITHUB_REPOSITORY --json tagName 2>$null
-                  if ($LASTEXITCODE -eq 0) { throw 'The FFmpeg release already exists. Verify existing assets before replacing them.' }
-
-                  $assets = @(Get-ChildItem -LiteralPath (Join-Path $env:RUNNER_TEMP 'ffmpeg-assets') -File | Select-Object -ExpandProperty FullName)
-                  $notes = Join-Path $env:RUNNER_TEMP 'ffmpeg-notes.md'
-                  @(
-                    "FFmpeg $env:FFMPEG_VERSION binaries and corresponding source archives."
-                    ''
-                    'Mirrored from [foreA-adoxid/ffmpeg-builds](https://github.com/foreA-adoxid/ffmpeg-builds/releases/tag/ffmpeg-binaries).'
-                    ''
-                    'The .sha256 files contain hashes of the executables.'
-                  ) | Set-Content -LiteralPath $notes -Encoding utf8
-                  gh release create ffmpeg-binaries @assets --repo $env:GITHUB_REPOSITORY --target $env:GITHUB_SHA --title "FFmpeg $env:FFMPEG_VERSION binaries" --notes-file $notes --latest=false
-                  if ($LASTEXITCODE -ne 0) { throw 'Could not create the FFmpeg release.' }
+                  ./toolset/ci/publish-ffmpeg-assets.ps1 -Version $env:FFMPEG_VERSION -AssetDirectory (Join-Path $env:RUNNER_TEMP 'ffmpeg-assets')

@@ -309,7 +309,12 @@
     grid-area: slider;
 }
 .ChangeTimecode_root_fullscreen__FA6r0 .ChangeTimecode_slider__P4qmT:not(:active)::before {
-    width: var(--overtone-progress, var(--seek-before-width));
+    width: 100%;
+    transform: translateY(-50%) scaleX(var(--overtone-progress-fraction, var(--seek-before-fraction, 0)));
+    transform-origin: left center;
+}
+.ChangeTimecode_root_fullscreen__FA6r0 .ChangeTimecode_slider__P4qmT:dir(rtl):not(:active)::before {
+    transform-origin: right center;
 }
 .ChangeTimecode_root_fullscreen__FA6r0 .ChangeTimecode_slider__P4qmT:not(:active)::-webkit-slider-thumb {
     translate: var(--overtone-thumb-offset, 0px) 0;

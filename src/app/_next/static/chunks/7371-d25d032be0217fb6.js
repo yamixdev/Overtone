@@ -1465,6 +1465,9 @@
                                         return {
                                             backgroundSize: ''.concat(e, '% 100%'),
                                             '--seek-before-width': ''.concat(e, '%'),
+                                            // for PulseSync: BEGIN provide a scale for the fullscreen progress fill
+                                            '--seek-before-fraction': d > 0 ? e / 100 : 0,
+                                            // for PulseSync: END provide a scale for the fullscreen progress fill
                                             '--buffered-width': ''.concat(t, '%'),
                                         };
                                     }, [p, u, d]);
@@ -1531,6 +1534,8 @@
             r.d(t, { useVisualPlaybackProgress: () => useVisualPlaybackProgress });
             function useVisualPlaybackProgress(ref, { position, duration, state, trackId, scrubbing, blocked, enabled = true, slider }) {
                 const lastSample = i.useRef(null);
+                const stopAnimation = i.useRef(null);
+                const motionPreference = i.useRef(null);
                 const sliderWidth = i.useRef(0);
                 i.useLayoutEffect(() => {
                     const element = slider?.current;
@@ -1544,63 +1549,88 @@
                 }, [slider, enabled]);
 
                 i.useLayoutEffect(() => {
+                    if (!enabled || !state) return;
+                    const motion = matchMedia('(prefers-reduced-motion: reduce)');
+                    motionPreference.current = motion;
+                    const invalidate = () => {
+                        lastSample.current = null;
+                        stopAnimation.current?.();
+                    };
+                    const unsubscribeStatus = state.status.onChange(invalidate);
+                    const unsubscribeSpeed = state.speed?.onChange?.(invalidate);
+                    const unsubscribeSeek = state.event?.onChange?.((event) => {
+                        if (event === 'Seeking' || event === 'Seeked' || event === 'SET_PROGRESS') invalidate();
+                    });
+                    motion.addEventListener('change', invalidate);
+                    document.addEventListener('visibilitychange', invalidate);
+                    return () => {
+                        invalidate();
+                        motionPreference.current = null;
+                        unsubscribeStatus?.();
+                        unsubscribeSpeed?.();
+                        unsubscribeSeek?.();
+                        motion.removeEventListener('change', invalidate);
+                        document.removeEventListener('visibilitychange', invalidate);
+                    };
+                }, [state, enabled]);
+
+                i.useLayoutEffect(() => {
                     const element = ref.current;
                     if (!element || !enabled || !state) return;
-                    const motion = matchMedia('(prefers-reduced-motion: reduce)');
                     const startedAt = performance.now();
                     const previous = lastSample.current;
-                    const sameTrack = previous?.trackId === trackId && previous?.duration === duration;
-                    const advanced = sameTrack && position > previous.position;
-                    const limit = advanced && previous.playing ? Math.min(750, Math.max(80, (startedAt - previous.at) * 1.15)) : 0;
-                    lastSample.current = { trackId, duration, position, at: startedAt, playing: state.status.value === 'playing' && !blocked };
+                    const continuous = previous && previous.trackId === trackId && previous.duration === duration && position >= previous.position;
+                    const limit = continuous && position > previous.position ? Math.min(750, Math.max(80, (startedAt - previous.at) * 1.15)) : 0;
+                    const floor = continuous ? Math.max(position, previous.displayed) : position;
+                    const sample = { trackId, duration, position, at: startedAt, displayed: position };
+                    lastSample.current = sample;
                     let frame;
                     const sliderElement = slider?.current;
 
-                    const reset = () => {
+                    const stop = () => {
+                        cancelAnimationFrame(frame);
                         element.style.removeProperty('--overtone-progress');
+                        element.style.removeProperty('--overtone-progress-fraction');
                         sliderElement?.style.removeProperty('--overtone-thumb-offset');
                     };
                     const render = (now) => {
-                        if (document.hidden || motion.matches || blocked || scrubbing?.current || trackId == null || !Number.isFinite(duration) || duration <= 0) {
-                            reset();
-                            return;
-                        }
-                        if (state.status.value !== 'playing') {
-                            reset();
-                            return;
-                        }
                         const rate = state.speed?.value ?? 1;
-                        if (!Number.isFinite(position) || !Number.isFinite(rate) || rate <= 0) {
-                            reset();
+                        if (
+                            document.hidden ||
+                            motionPreference.current?.matches ||
+                            blocked ||
+                            scrubbing?.current ||
+                            trackId == null ||
+                            state.status.value !== 'playing' ||
+                            state.event?.value === 'Seeking' ||
+                            !Number.isFinite(duration) ||
+                            duration <= 0 ||
+                            !Number.isFinite(position) ||
+                            !Number.isFinite(rate) ||
+                            rate <= 0
+                        ) {
+                            lastSample.current = null;
+                            stop();
                             return;
                         }
                         const elapsed = Math.min(limit, Math.max(0, now - startedAt));
-                        const displayed = Math.max(0, Math.min(duration, position + (elapsed * rate) / 1000));
+                        const displayed = Math.max(0, Math.min(duration, Math.max(floor, position + (elapsed * rate) / 1000)));
+                        sample.displayed = displayed;
                         const fraction = displayed / duration;
                         element.style.setProperty('--overtone-progress', fraction * 100 + '%');
                         if (sliderElement && Number(sliderElement.max) > 0) {
+                            element.style.setProperty('--overtone-progress-fraction', fraction);
                             const nativeFraction = sliderElement.valueAsNumber / Number(sliderElement.max);
                             sliderElement.style.setProperty('--overtone-thumb-offset', (fraction - nativeFraction) * sliderWidth.current + 'px');
                         }
                         if (elapsed < limit && displayed < duration) frame = requestAnimationFrame(render);
                     };
 
-                    const sync = () => {
-                        cancelAnimationFrame(frame);
-                        reset();
-                    };
-                    const unsubscribe = state.status.onChange(() => {
-                        if (lastSample.current) lastSample.current.playing = false;
-                        sync();
-                    });
-                    motion.addEventListener('change', sync);
-                    document.addEventListener('visibilitychange', sync);
+                    stopAnimation.current = stop;
                     render(startedAt);
                     return () => {
-                        sync();
-                        unsubscribe?.();
-                        motion.removeEventListener('change', sync);
-                        document.removeEventListener('visibilitychange', sync);
+                        stop();
+                        stopAnimation.current = null;
                     };
                 }, [ref, state, trackId, scrubbing, blocked, enabled, slider, position, duration]);
             }

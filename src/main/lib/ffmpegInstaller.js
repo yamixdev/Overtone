@@ -10,6 +10,9 @@ const crypto = require('crypto');
 const tar = require('tar');
 const { pipeline } = require('stream/promises');
 const Logger_js_1 = require('../packages/logger/Logger.js');
+const { downloadFileWithProgress } = require('./utils.js');
+const { queueComponentInstall } = require('./componentInstall.js');
+const { FFMPEG_CHANNEL_TAG, resolveFfmpegTag } = require('./ffmpegRelease.js');
 
 const HASH_REQUEST_TIMEOUT_MS = 5000;
 
@@ -42,7 +45,7 @@ async function sha256File(p) {
 }
 
 class FfmpegUpdater {
-    constructor({ repo, tagName = 'ffmpeg-binaries', requireHash = true } = {}) {
+    constructor({ repo, tagName = FFMPEG_CHANNEL_TAG, requireHash = true } = {}) {
         if (typeof repo !== 'string' || !repo.includes('/')) {
             throw new Error(`"repo" must be in form "OWNER/REPO"`);
         }
@@ -76,12 +79,12 @@ class FfmpegUpdater {
         this.logger.log('Require hash:', this.requireHash);
     }
 
-    getDownloadUrl() {
-        return `https://github.com/${this.repo}/releases/download/${this.tagName}/${this.assetName}`;
+    getDownloadUrl(tag = this.tagName) {
+        return `https://github.com/${this.repo}/releases/download/${tag}/${this.assetName}`;
     }
 
-    getHashUrl() {
-        return `https://github.com/${this.repo}/releases/download/${this.tagName}/ffmpeg-${this.platform}-${this.arch}.sha256`;
+    getHashUrl(tag = this.tagName) {
+        return `https://github.com/${this.repo}/releases/download/${tag}/ffmpeg-${this.platform}-${this.arch}.sha256`;
     }
 
     async fileExists(p) {
@@ -121,11 +124,11 @@ class FfmpegUpdater {
         await this.cleanupDirIfExists(this.extractDir);
     }
 
-    async fetchExpectedHash() {
+    async fetchExpectedHash(tag) {
         const agent = new https.Agent({ keepAlive: true });
 
         try {
-            const resp = await axios.get(this.getHashUrl(), {
+            const resp = await axios.get(this.getHashUrl(tag), {
                 httpsAgent: agent,
                 responseType: 'text',
                 timeout: HASH_REQUEST_TIMEOUT_MS,
@@ -151,79 +154,16 @@ class FfmpegUpdater {
         }
     }
 
-    /**
-     * Проверяет, установлен ли FFmpeg:
-     * - бинарник существует
-     * - при requireHash=true совпадает SHA-256
-     */
-    async isInstalled({ verifyLatest = false } = {}) {
-        if (!(await this.fileExists(this.installPath))) {
-            return false;
-        }
-
-        if (!this.requireHash) {
-            return true;
-        }
-
-        const expected = await this.fetchExpectedHash();
-        if (!expected) {
-            if (verifyLatest) throw new Error('FFmpeg checksum unavailable');
-            return true;
-        }
-
-        const actual = await sha256File(this.installPath);
-        return actual.toLowerCase() === expected.toLowerCase();
-    }
-
-    /**
-     * Скачивание с прогрессом (callback) как в старом скрипте:
-     * - callback(progress, progress) на чанках (0..1)
-     * - callback(-1, -1) при ошибке
-     * - callback(1.1, -1) после успешной загрузки
-     */
     async download(url, out, callback) {
         await fsPromise.mkdir(path.dirname(out), { recursive: true });
-
-        // Удаляем старый файл перед скачиванием
         await this.deleteFileIfExists(out);
-
-        const agent = new https.Agent({ keepAlive: true });
-        const resp = await axios.get(url, {
-            responseType: 'stream',
-            httpsAgent: agent,
-            headers: { 'User-Agent': 'Electron-FFmpeg-Updater' },
-            maxRedirects: 10,
-            validateStatus: (s) => s >= 200 && s < 400,
+        callback?.(0, 0);
+        const { bytes } = await downloadFileWithProgress(url, out, (progress) => callback?.(progress, progress), undefined, {
+            signal: AbortSignal.timeout(10 * 60_000),
         });
-
-        const totalLength = parseInt(resp.headers['content-length'] || '0', 10);
-        let downloaded = 0;
-
-        resp.data.on('data', (chunk) => {
-            downloaded += chunk.length;
-            if (typeof callback === 'function') {
-                const progress = totalLength > 0 ? downloaded / totalLength : 0;
-                callback(progress, progress);
-            }
-        });
-
-        try {
-            await pipeline(resp.data, fs.createWriteStream(out));
-        } catch (e) {
-            await this.deleteFileIfExists(out);
-            if (typeof callback === 'function') callback(-1, -1);
-            throw e;
-        }
-
-        // sanity: минимальная проверка размера
-        const st = await fsPromise.stat(out).catch(() => null);
-        if (!st || st.size < 1024 * 1024) {
-            await this.deleteFileIfExists(out);
-            throw new Error(`Downloaded file too small (${st?.size || 0} bytes). Likely not a valid tar.gz.`);
-        }
-
-        if (typeof callback === 'function') callback(1.1, -1);
-        this.logger.log('Downloaded tar.gz:', out, 'size:', st.size);
+        if (bytes < 1024 * 1024) throw new Error(`Downloaded FFmpeg archive is too small (${bytes} bytes)`);
+        callback?.(1.1, -1);
+        this.logger.log('Downloaded tar.gz:', out, 'size:', bytes);
     }
 
     async extract() {
@@ -237,16 +177,13 @@ class FfmpegUpdater {
         });
     }
 
-    async install() {
+    async install(expectedHash) {
         const src = path.join(this.extractDir, getBinaryName(this.platform));
         if (!(await this.fileExists(src))) {
             throw new Error('Extracted ffmpeg binary not found');
         }
-        if (this.requireHash) {
-            const expected = await this.fetchExpectedHash();
-            if (!expected || (await sha256File(src)) !== expected) {
-                throw new Error('Could not verify FFmpeg SHA-256');
-            }
+        if (this.requireHash && (await sha256File(src)) !== expectedHash) {
+            throw new Error('Could not verify FFmpeg SHA-256');
         }
 
         if (process.platform !== 'win32') {
@@ -255,55 +192,46 @@ class FfmpegUpdater {
         await fsPromise.rename(src, this.installPath);
     }
 
-    /**
-     * Совместимый интерфейс со старым скриптом:
-     * ensureInstalled(callback, { force })
-     *
-     * Добавлено: очистка кеша после успешной установки (и best-effort при ошибках).
-     */
-    ensureInstalled(callback, { force = false } = {}) {
-        if (!this.installing) {
-            this.installing = this.installIfNeeded(callback, force).finally(() => {
-                this.installing = null;
-            });
-        }
-        return this.installing;
+    ensureInstalled(callback) {
+        return queueComponentInstall(this, () => this.installIfNeeded(callback, false)).then(() => this.installPath);
     }
 
-    async installIfNeeded(callback, force) {
-        if (!force) {
-            if (this.isInstalledValidated && (await this.fileExists(this.installPath))) {
-                this.logger.log('FFmpeg already installed (cached validation)');
-                return this.installPath;
-            }
+    updateIfNeeded(callback) {
+        return queueComponentInstall(this, () => this.installIfNeeded(callback, true), true);
+    }
 
-            const ok = await this.isInstalled();
-            if (ok) {
-                this.isInstalledValidated = true;
-                this.logger.log('FFmpeg already installed');
-                return this.installPath;
+    async installIfNeeded(callback, verifyLatest) {
+        const exists = await this.fileExists(this.installPath);
+        if (exists && (!this.requireHash || (!verifyLatest && this.isInstalledValidated))) return false;
+
+        let tag;
+        let expectedHash;
+        try {
+            tag = await resolveFfmpegTag(this.repo, this.tagName);
+            if (this.requireHash) {
+                expectedHash = await this.fetchExpectedHash(tag);
+                if (!expectedHash) throw new Error('FFmpeg checksum unavailable');
             }
+        } catch (error) {
+            if (exists && !verifyLatest) return false;
+            throw error;
+        }
+
+        if (exists && (await sha256File(this.installPath)) === expectedHash) {
+            this.isInstalledValidated = true;
+            return false;
         }
 
         this.isInstalledValidated = false;
-
         try {
             this.logger.log('Downloading:', this.assetName);
-            await this.download(this.getDownloadUrl(), this.archivePath, callback);
-
+            await this.download(this.getDownloadUrl(tag), this.archivePath, callback);
             await this.extract();
-            await this.install();
-
-            // ✅ Очистка кеша после успешной установки
-            await this.clearCache();
-
+            await this.install(expectedHash);
             this.isInstalledValidated = true;
-
-            return this.installPath;
-        } catch (e) {
-            // Best-effort cleanup кеша при ошибках тоже
+            return true;
+        } finally {
             await this.clearCache();
-            throw e;
         }
     }
 }

@@ -976,7 +976,16 @@
                 pulseToastStylesModule = t(90945),
                 pulseToastStyles = t.n(pulseToastStylesModule),
                 pulseToastIntl = t(2058);
-            // for PulseSync: BEGIN display Overtone download and install progress in the action
+            const renderPulseSyncToastProgress = (progress) =>
+                (0, pulseToastJsx.jsx)('div', {
+                    className: 'pulsesync-toast-progress',
+                    'aria-hidden': true,
+                    style: {
+                        '--pulsesync-toast-progress': Math.min(100, Math.max(0, progress)) / 100,
+                        opacity: progress >= 0 && progress <= 100 ? 1 : 0,
+                    },
+                });
+            // for PulseSync: BEGIN display Overtone download and install progress
             const PulseSyncModUpdateToast = ({ version, formatMessage, closeToast, operation, portable }) => {
                 const [progress, setProgress] = pulseToastReact.useState(operation.progress);
                 const [pending, setPending] = pulseToastReact.useState(false);
@@ -1010,7 +1019,7 @@
                     sync();
                     return () => operation.listeners.delete(sync);
                 }, [operation]);
-                return (0, pulseToastJsx.jsx)(pulseToastBase.$, {
+                return (0, pulseToastJsx.jsxs)(pulseToastBase.$, {
                     className: (0, pulseToastClassNames.$)(pulseToastStyles().root, pulseToastStyles().important),
                     message: (0, pulseToastJsx.jsxs)('div', {
                         className: pulseToastStyles().message,
@@ -1038,9 +1047,10 @@
                             }),
                         ],
                     }),
+                    children: [renderPulseSyncToastProgress(progress)],
                 });
             };
-            // for PulseSync: END display Overtone download and install progress in the action
+            // for PulseSync: END display Overtone download and install progress
             const PulseSyncProgressToast = (e) => {
                 let { closeToast: t, message: n, buttonLabel: o, onButtonClick: l, disabled: u = false, dismissOnButtonClick: d = false, operation } = e;
                 const [h, v] = pulseToastReact.useState(operation.progress),
@@ -1092,23 +1102,7 @@
                 return (0, pulseToastJsx.jsxs)(pulseToastBase.$, {
                     className: (0, pulseToastClassNames.$)(pulseToastStyles().root, pulseToastStyles().important),
                     message: C,
-                    children: [
-                        (0, pulseToastJsx.jsx)('div', {
-                            className: 'qaIScXjx1qyXuaIHXQIo',
-                            style: {
-                                overflow: 'hidden',
-                                left: '0',
-                                top: '0',
-                                position: 'absolute',
-                                width: h + '%',
-                                height: '100%',
-                                backgroundColor: 'rgb(255 255 255)',
-                                opacity: h <= 100 ? 0.1 : 0,
-                                zIndex: 1,
-                                transition: 'opacity 0.3s linear 0.5s, width 0.2s',
-                            },
-                        }),
-                    ],
+                    children: [renderPulseSyncToastProgress(h)],
                 });
             };
             const usePulseSyncDownloadNotifications = () => {

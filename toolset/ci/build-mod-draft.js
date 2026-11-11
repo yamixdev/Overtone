@@ -112,7 +112,7 @@ async function getFfmpegRepository(source) {
 }
 
 async function main() {
-    const { GITHUB_OUTPUT, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, RUNNER_TEMP } = process.env;
+    const { GITHUB_OUTPUT, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_REPOSITORY, GITHUB_SERVER_URL, RUNNER_TEMP } = process.env;
     if (process.platform !== 'win32' || process.arch !== 'x64' || !GITHUB_OUTPUT || !RUNNER_TEMP || !/^\d+$/.test(GITHUB_RUN_ID) || !/^\d+$/.test(GITHUB_RUN_ATTEMPT)) {
         throw new Error('Сборка черновика рассчитана на Windows x64 в GitHub Actions.');
     }
@@ -229,10 +229,19 @@ async function main() {
         `/DExecutableSize=${executable.size}`,
     ]);
 
+    const tag = prerelease ? `overtone-${modVersion}` : `draft-yandex-${yandexMusicVersion}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`;
+    const downloads = `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(tag)}`;
     const notes = path.join(workspace, 'release-notes.md');
     await fsp.writeFile(
         notes,
         [
+            '## Скачать',
+            '',
+            `1. [Установщик Windows x64 (.exe)](${downloads}/${encodeURIComponent(path.basename(installer))})`,
+            `2. [Portable ZIP](${downloads}/${encodeURIComponent(path.basename(zip))})`,
+            '',
+            'Файлы быстрого обновления Overtone скачивает автоматически.',
+            '',
             `Яндекс Музыка **${yandexMusicVersion}** для Windows x64 с модификацией **${modName} ${modVersion}**.`,
             `Electron **${electronVersion}**.`,
             '',
@@ -246,9 +255,9 @@ async function main() {
         'utf8',
     );
     const outputs = {
-        tag: prerelease ? `overtone-${modVersion}` : `draft-yandex-${yandexMusicVersion}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`,
+        tag,
         prerelease,
-        title: `Яндекс Музыка ${yandexMusicVersion} + ${modName} ${modVersion} (Windows x64)`,
+        title: `${modName} ${modVersion}`,
         commit,
         zip,
         checksum,

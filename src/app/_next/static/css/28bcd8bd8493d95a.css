@@ -1,7 +1,28 @@
 .NotificationUpdate_root__hpSQi.NotificationUpdate_important___0WHj {
     padding: var(--ym-spacer-size-xxs);
     padding-inline-start: var(--ym-spacer-size-l);
+    /* for PulseSync: BEGIN keep download progress inside the notification */
+    overflow: hidden;
+    position: relative;
+    /* for PulseSync: END keep download progress inside the notification */
 }
+/* for PulseSync: BEGIN download notification progress fill */
+.pulsesync-toast-progress {
+    background-color: rgb(255 255 255 / 0.1);
+    inset: 0;
+    pointer-events: none;
+    position: absolute;
+    transform: scaleX(var(--pulsesync-toast-progress));
+    transform-origin: left center;
+    transition: transform 0.2s ease-out, opacity 0.15s linear;
+    z-index: 1;
+}
+@media (prefers-reduced-motion: reduce) {
+    .pulsesync-toast-progress {
+        transition: none;
+    }
+}
+/* for PulseSync: END download notification progress fill */
 .NotificationUpdate_text__YylYD {
     color: var(--ym-controls-color-primary-text-enabled_variant);
 }

@@ -144,10 +144,18 @@ jobs:
               run: |
                   $releaseFlags = @('--draft')
                   if ($env:DRAFT_PRERELEASE -eq 'true') { $releaseFlags += @('--prerelease', '--latest=false') }
-                  $releaseAssets = @($env:ZIP_PATH, $env:CHECKSUM_PATH, $env:INSTALLER_PATH, $env:INSTALLER_CHECKSUM_PATH, $env:FAST_ARCHIVE_PATH, $env:FAST_MANIFEST_PATH, $env:FAST_INSTALLER_PATH)
+                  $releaseAssets = @(
+                    "${env:INSTALLER_PATH}#Установщик Windows x64 (.exe)"
+                    "${env:ZIP_PATH}#Portable ZIP"
+                    "${env:INSTALLER_CHECKSUM_PATH}#SHA-256 установщика"
+                    "${env:CHECKSUM_PATH}#SHA-256 архива Portable"
+                    "${env:FAST_ARCHIVE_PATH}#Архив автообновления"
+                    "${env:FAST_MANIFEST_PATH}#Манифест автообновления"
+                    "${env:FAST_INSTALLER_PATH}#Служебный установщик автообновления"
+                  )
                   $releaseUrl = gh release create $env:DRAFT_TAG @releaseAssets --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH @releaseFlags
                   if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
                   "[Черновик GitHub Release]($releaseUrl)" >> $env:GITHUB_STEP_SUMMARY
-                  "[Скачать ZIP из GitHub Actions]($env:PORTABLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
                   "[Скачать установщик из GitHub Actions]($env:INSTALLER_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
+                  "[Скачать ZIP из GitHub Actions]($env:PORTABLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY
                   "[Скачать контрольные суммы из GitHub Actions]($env:CHECKSUM_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY

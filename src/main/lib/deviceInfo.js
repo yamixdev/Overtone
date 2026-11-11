@@ -23,18 +23,20 @@ exports.devicePlatform = (0, node_os_1.platform)();
 const toMB = (bytes) => {
     return Math.round(bytes / 1024 / 1024);
 };
-const getAppMetrics = () => {
-    const metrics = electron_1.app.getAppMetrics();
-    const { cpu, memory } = metrics[0] ?? {};
-    const { workingSetSize, peakWorkingSetSize } = memory ?? {};
-    return {
+const kibToMiB = (kibibytes) => Math.round(kibibytes / 1024);
+const getAppMetrics = () => ({
+    processes: electron_1.app.getAppMetrics().map(({ pid, type, name, cpu, memory }) => ({
+        pid,
+        type,
+        name,
         cpu,
         memory: {
-            workingSetSizeMB: workingSetSize ? toMB(workingSetSize) : 0,
-            peakWorkingSetSizeMB: peakWorkingSetSize ? toMB(peakWorkingSetSize) : 0,
+            workingSetSizeMiB: kibToMiB(memory.workingSetSize),
+            peakWorkingSetSizeMiB: kibToMiB(memory.peakWorkingSetSize),
+            ...(memory.privateBytes === undefined ? {} : { privateMemoryMiB: kibToMiB(memory.privateBytes) }),
         },
-    };
-};
+    })),
+});
 const updateMaxDisplayFrameRateRefresh = () => {
     deviceInfoLogger.info('Getting max refresh rate');
     const displays = electron_1.screen?.getAllDisplays() ?? [electron_1.screen?.getPrimaryDisplay()];
@@ -111,11 +113,9 @@ const getHardwareInfo = async (params) => {
 const getSystemMetrics = async (params) => {
     const systemMetrics = {
         memory: getMemory(),
+        ...(params?.withAppMetrics && { appMetrics: getAppMetrics() }),
         storage: await getStorage(),
     };
-    if (params?.withAppMetrics) {
-        systemMetrics.appMetrics = getAppMetrics();
-    }
     return systemMetrics;
 };
 const printObject = (info) => {

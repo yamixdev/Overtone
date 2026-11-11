@@ -3,10 +3,13 @@ const fsp = require('node:fs/promises');
 const path = require('node:path');
 const { execFileSync, spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
+const { pipeline } = require('node:stream/promises');
+const { createGzip } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const { createToolsetCore } = require('../core.js');
 const { OVERTONE_FFMPEG_REPOSITORY, FFMPEG_CHANNEL_TAG, readFfmpegRelease, resolveFfmpegTag } = require('../../src/main/lib/ffmpegRelease.js');
 const { appExecutableName, electronVersion, packageWindowsClient } = require('./package-windows-client.js');
+const { describeExecutable, getUpdateLayout, hashFile } = require('../../src/main/lib/overtoneAsarUpdate.js');
 
 function readManifest(asar, archive) {
     return JSON.parse(asar.extractFile(archive, 'package.json').toString('utf8'));
@@ -88,12 +91,8 @@ async function smokeTest(executable, userData, appConfig) {
 }
 
 async function writeChecksum(filePath) {
-    const hash = createHash('sha256');
-    for await (const chunk of fs.createReadStream(filePath)) {
-        hash.update(chunk);
-    }
     const checksum = `${filePath}.sha256`;
-    await fsp.writeFile(checksum, `${hash.digest('hex')}  ${path.basename(filePath)}\n`, 'utf8');
+    await fsp.writeFile(checksum, `${await hashFile(filePath)}  ${path.basename(filePath)}\n`, 'utf8');
     return checksum;
 }
 
@@ -194,19 +193,41 @@ async function main() {
     const installerName = `Overtone-Setup-${modVersion}-win-x64`;
     const installer = path.join(workspace, `${installerName}.exe`);
     const innoSetupCompiler = path.join(process.env['ProgramFiles(x86)'], 'Inno Setup 6', 'ISCC.exe');
-    execFileSync(
-        innoSetupCompiler,
-        [
-            `/DStageDir=${stage}`,
-            `/DModVersion=${modVersion}`,
-            `/DAppExe=${appExecutableName}`,
-            `/O${workspace}`,
-            `/F${installerName}`,
-            path.join(__dirname, 'overtone.iss'),
-        ],
-        { stdio: 'inherit', windowsHide: true },
-    );
+    const buildInstaller = (name, defines = []) =>
+        execFileSync(
+            innoSetupCompiler,
+            [
+                `/DStageDir=${stage}`,
+                `/DModVersion=${modVersion}`,
+                `/DAppExe=${appExecutableName}`,
+                `/O${workspace}`,
+                `/F${name}`,
+                ...defines,
+                path.join(__dirname, 'overtone.iss'),
+            ],
+            { stdio: 'inherit', windowsHide: true },
+        );
+    buildInstaller(installerName);
     const installerChecksum = await writeChecksum(installer);
+
+    const fastPrefix = `Overtone-ASAR-${modVersion}-win-x64`;
+    const fastArchive = path.join(workspace, `${fastPrefix}.asar.gz`);
+    const fastManifest = path.join(workspace, `${fastPrefix}.json`);
+    const fastInstaller = path.join(workspace, `${fastPrefix}.exe`);
+    const stagedArchive = path.join(stage, 'resources', 'app.asar');
+    const headerHash = createHash('sha256').update(asar.getRawHeader(stagedArchive).headerString).digest('hex');
+    const executable = describeExecutable(await fsp.readFile(path.join(stage, appExecutableName)), headerHash);
+    const archive = { size: (await fsp.stat(stagedArchive)).size, sha256: await hashFile(stagedArchive) };
+    await pipeline(fs.createReadStream(stagedArchive), createGzip({ level: 9 }), fs.createWriteStream(fastArchive));
+    const layout = await getUpdateLayout(stage);
+    await fsp.writeFile(fastManifest, `${JSON.stringify({ schema: 1, version: modVersion, electronVersion, ffmpegRepository, layout, archive, executable })}\n`);
+    buildInstaller(fastPrefix, [
+        '/DFastUpdate=1',
+        `/DArchiveHash=${archive.sha256}`,
+        `/DArchiveSize=${archive.size}`,
+        `/DExecutableHash=${executable.sha256}`,
+        `/DExecutableSize=${executable.size}`,
+    ]);
 
     const notes = path.join(workspace, 'release-notes.md');
     await fsp.writeFile(
@@ -233,6 +254,9 @@ async function main() {
         checksum,
         installer,
         installerChecksum,
+        fastArchive,
+        fastManifest,
+        fastInstaller,
         notes,
     };
     await fsp.appendFile(

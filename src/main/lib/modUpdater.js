@@ -2,8 +2,8 @@
 
 const { spawn } = require('node:child_process');
 const { createHash, randomUUID } = require('node:crypto');
-const fs = require('node:fs');
-const fsp = require('node:fs/promises');
+const fs = process.versions.electron ? require('original-fs') : require('node:fs');
+const { promises: fsp } = fs;
 const path = require('node:path');
 const { Readable, Transform } = require('node:stream');
 const { pipeline } = require('node:stream/promises');
@@ -14,11 +14,13 @@ const { Logger } = require('../packages/logger/Logger.js');
 const { state } = require('./state.js');
 const { getUpdateChannel } = require('./updateChannel.js');
 const { getModSettings } = require('./store.js');
+const { APP_EXE, getUpdateLayout, hashFile, patchExecutable, unpackArchive, verifyFastManifest } = require('./overtoneAsarUpdate.js');
 
 const RELEASE_API = 'https://api.github.com/repos/yamixdev/Overtone/releases';
 const RELEASE_PATH = '/yamixdev/Overtone/releases/download/';
 const INSTALLER_NAME = /^Overtone-Setup-(\d+\.\d+\.\d+(?:-beta\.\d+)?)-win-x64\.exe$/;
 const PORTABLE_NAME = /^Yandex-Music-\d+\.\d+\.\d+-Overtone-(\d+\.\d+\.\d+(?:-beta\.\d+)?)-win-x64-\d+-\d+\.zip$/;
+const FAST_UPDATE_NAME = /^Overtone-ASAR-(\d+\.\d+\.\d+(?:-beta\.\d+)?)-win-x64\.(?:asar\.gz|exe|asar|bin)$/;
 const MAX_INSTALLER_BYTES = 512 * 1024 * 1024;
 const CURRENT_VERSION = config.modification.version;
 
@@ -44,6 +46,29 @@ function readAsset(asset) {
     }
 }
 
+function fastPrefix(version) {
+    return `Overtone-ASAR-${version}-win-x64`;
+}
+
+function selectFastAssets(assets, version, installerSize) {
+    const prefix = fastPrefix(version);
+    const manifest = readAsset(assets.find((asset) => asset?.name === `${prefix}.json`));
+    const archive = readAsset(assets.find((asset) => asset?.name === `${prefix}.asar.gz`));
+    const installer = readAsset(assets.find((asset) => asset?.name === `${prefix}.exe`));
+    if (manifest && manifest.size <= 16 * 1024 && archive && installer && manifest.size + archive.size + installer.size < installerSize) {
+        return { manifest, archive, installer };
+    }
+    return null;
+}
+
+function readPendingAsset(saved) {
+    return readAsset({ ...saved, state: 'uploaded', browser_download_url: saved?.url, digest: `sha256:${saved?.digest}` });
+}
+
+function isCompatibleManifest(manifest, version) {
+    return verifyFastManifest(manifest, version, process.versions.electron, config.app?.ffmpegRepository);
+}
+
 function selectOvertoneRelease(release, currentVersion, portable, beta = false) {
     if (!release || release.draft !== false || release.prerelease !== beta || !semver.valid(currentVersion)) return null;
     const assets = Array.isArray(release.assets) ? release.assets : [];
@@ -55,7 +80,9 @@ function selectOvertoneRelease(release, currentVersion, portable, beta = false) 
 
     const matchingAssets = portable ? assets.filter((asset) => PORTABLE_NAME.exec(asset?.name ?? '')?.[1] === version) : installers;
     const asset = matchingAssets.length === 1 ? readAsset(matchingAssets[0]) : null;
-    return asset && { ...asset, version, portable };
+    if (!asset) return null;
+    const fast = !portable && selectFastAssets(assets, version, asset.size);
+    return { ...asset, version, portable, ...(fast && { fast }) };
 }
 
 function selectOvertoneBetaRelease(releases, currentVersion, portable) {
@@ -66,7 +93,7 @@ function selectOvertoneBetaRelease(releases, currentVersion, portable) {
     }, null);
 }
 
-async function downloadInstaller(asset, target, progress) {
+async function downloadAsset(asset, target, progress = () => {}) {
     const response = await fetch(asset.url, { signal: AbortSignal.timeout(10 * 60_000) });
     if (!response.ok || !response.body) throw new Error(`HTTP ${response.status}`);
 
@@ -79,7 +106,7 @@ async function downloadInstaller(asset, target, progress) {
                 bytes += chunk.length;
                 if (bytes > asset.size) return callback(new Error('Overtone update exceeds its published size'));
                 hash.update(chunk);
-                progress(bytes / asset.size, bytes / asset.size);
+                progress(bytes / asset.size);
                 callback(null, chunk);
             },
         }),
@@ -88,13 +115,15 @@ async function downloadInstaller(asset, target, progress) {
     if (bytes !== asset.size || hash.digest('hex') !== asset.digest) throw new Error('Overtone update SHA-256 mismatch');
 }
 
-class InstallerIntegrityError extends Error {}
+class UpdateIntegrityError extends Error {}
 
-async function verifyInstaller(installer, asset) {
-    if ((await fsp.stat(installer)).size !== asset.size) throw new InstallerIntegrityError('Overtone installer size mismatch');
-    const hash = createHash('sha256');
-    for await (const chunk of fs.createReadStream(installer)) hash.update(chunk);
-    if (hash.digest('hex') !== asset.digest) throw new InstallerIntegrityError('Overtone installer SHA-256 mismatch');
+async function verifyFile(file, { size, sha256 }) {
+    if ((await fsp.stat(file)).size !== size) throw new UpdateIntegrityError('Overtone update size mismatch');
+    if ((await hashFile(file)) !== sha256) throw new UpdateIntegrityError('Overtone update SHA-256 mismatch');
+}
+
+function verifyAsset(file, asset) {
+    return verifyFile(file, { size: asset.size, sha256: asset.digest });
 }
 
 class ModUpdater {
@@ -109,6 +138,7 @@ class ModUpdater {
     installing = false;
     clearing = false;
     progress = -100;
+    skipFastVersion = null;
 
     get cacheDir() {
         return path.join(app.getPath('userData'), 'overtone-updates');
@@ -118,13 +148,61 @@ class ModUpdater {
         return path.join(this.cacheDir, 'pending.json');
     }
 
-    async savePending(asset, installAttempted = false) {
+    async savePending({ asset, fast }, installAttempted = false) {
         const partial = `${this.pendingFile}.${randomUUID()}.part`;
+        const { fast: _fastAssets, ...installer } = asset;
         try {
-            await fsp.writeFile(partial, JSON.stringify({ ...asset, installAttempted }), { flag: 'wx' });
+            await fsp.writeFile(partial, JSON.stringify({ ...installer, fast, installAttempted }), { flag: 'wx' });
             await fsp.rename(partial, this.pendingFile);
         } finally {
             await fsp.rm(partial, { force: true }).catch(() => {});
+        }
+    }
+
+    fastFiles(version) {
+        const prefix = path.join(this.cacheDir, fastPrefix(version));
+        return { installer: `${prefix}.exe`, archive: `${prefix}.asar.gz`, unpacked: `${prefix}.asar`, executable: `${prefix}.bin` };
+    }
+
+    async verifyPreparedUpdate(downloaded) {
+        const { asset, fast, path: installer } = downloaded;
+        if (!fast) return verifyAsset(installer, asset);
+        const files = this.fastFiles(asset.version);
+        await verifyAsset(installer, fast.installer);
+        await verifyFile(files.unpacked, fast.manifest.archive);
+        await verifyFile(files.executable, fast.manifest.executable);
+    }
+
+    async prepareFastUpdate(candidate, progress) {
+        const { version, fast } = candidate;
+        if (!fast || this.skipFastVersion === version) return null;
+        const files = this.fastFiles(version);
+        const manifestFile = `${files.installer}.${randomUUID()}.part`;
+        let prepared = false;
+        try {
+            await downloadAsset(fast.manifest, manifestFile);
+            const manifest = JSON.parse(await fsp.readFile(manifestFile, 'utf8'));
+            if (!isCompatibleManifest(manifest, version)) return null;
+            const appDirectory = path.dirname(process.resourcesPath);
+            if (!(await fsp.stat(path.join(appDirectory, 'build.json'))).isFile()) return null;
+            if ((await getUpdateLayout(appDirectory)) !== manifest.layout) return null;
+            await Promise.all(Object.values(files).map((file) => fsp.rm(file, { force: true })));
+            await patchExecutable(path.join(appDirectory, APP_EXE), files.executable, manifest.executable);
+
+            const total = fast.archive.size + fast.installer.size;
+            const archiveShare = fast.archive.size / total;
+            await downloadAsset(fast.archive, files.archive, (fraction) => progress(fraction * archiveShare));
+            await downloadAsset(fast.installer, files.installer, (fraction) => progress(archiveShare + fraction * (1 - archiveShare)));
+            progress(-2);
+            await unpackArchive(files.archive, files.unpacked, manifest.archive);
+            prepared = true;
+            return { asset: candidate, path: files.installer, fast: { installer: fast.installer, manifest } };
+        } catch (error) {
+            this.logger.warn('Could not prepare the ASAR update, using the full installer:', error);
+            return null;
+        } finally {
+            await fsp.rm(manifestFile, { force: true }).catch(() => {});
+            if (!prepared) await Promise.all(Object.values(files).map((file) => fsp.rm(file, { force: true }).catch(() => {})));
         }
     }
 
@@ -134,19 +212,32 @@ class ModUpdater {
             const saved = JSON.parse(await fsp.readFile(this.pendingFile, 'utf8'));
             const version = INSTALLER_NAME.exec(saved?.name ?? '')?.[1];
             const channel = getUpdateChannel();
-            const asset = readAsset({ ...saved, state: 'uploaded', browser_download_url: saved?.url, digest: `sha256:${saved?.digest}` });
-            if (!asset || semver.valid(version) !== version) return false;
-            const installer = path.join(this.cacheDir, asset.name);
-            if (!semver.gt(version, CURRENT_VERSION)) {
-                await fsp.rm(this.pendingFile, { force: true });
-                await fsp.rm(installer, { force: true }).catch(() => {});
-                return false;
-            }
+            const asset = readPendingAsset(saved);
+            if (!asset || semver.valid(version) !== version || !semver.gt(version, CURRENT_VERSION)) return false;
             if (saved.channel !== channel || Boolean(semver.prerelease(version)) !== (channel === 'overtone-beta')) return false;
-            await verifyInstaller(installer, asset);
+            const candidate = { ...asset, version, channel, portable: false };
+            let downloaded;
+            if (saved.fast) {
+                const installer = readPendingAsset(saved.fast.installer);
+                const { manifest } = saved.fast;
+                if (!saved.installAttempted && installer?.name === `${fastPrefix(version)}.exe` && isCompatibleManifest(manifest, version)) {
+                    downloaded = { asset: candidate, path: this.fastFiles(version).installer, fast: { installer, manifest } };
+                    try {
+                        await this.verifyPreparedUpdate(downloaded);
+                    } catch (error) {
+                        this.logger.warn('Could not restore the prepared ASAR update:', error);
+                        downloaded = null;
+                    }
+                }
+                if (!downloaded) this.skipFastVersion = version;
+            } else {
+                downloaded = { asset: candidate, path: path.join(this.cacheDir, asset.name) };
+                await this.verifyPreparedUpdate(downloaded);
+            }
             if (getUpdateChannel() !== channel) return false;
-            this.available = { ...asset, version, channel, portable: false };
-            this.downloaded = { path: installer, asset: this.available };
+            this.available = candidate;
+            if (!downloaded) return false;
+            this.downloaded = downloaded;
             this.progress = 110;
             return saved.installAttempted !== true && getModSettings()?.appAutoUpdates?.installDownloadedOnStartup === true && (await this.onInstallUpdate());
         } catch (error) {
@@ -161,7 +252,8 @@ class ModUpdater {
         for (const listener of this.listeners) listener(CURRENT_VERSION, asset.version, asset.portable, this.progress, allowAutoDownload);
     }
 
-    async clearCache() {
+    async clearCache({ obsoleteOnly = false } = {}) {
+        if (obsoleteOnly && (!app.isPackaged || this.portable || !semver.valid(CURRENT_VERSION))) return 'empty';
         if (this.downloading || this.installing || this.checking || this.clearing) return 'busy';
         this.clearing = true;
         try {
@@ -172,20 +264,28 @@ class ModUpdater {
             let removed = false;
             for (const file of files) {
                 const partialBase = file.name.replace(/\.[a-f0-9-]{36}\.part$/i, '');
-                if (!file.isFile() || (partialBase !== 'pending.json' && !INSTALLER_NAME.test(partialBase))) continue;
+                const update = INSTALLER_NAME.exec(partialBase) ?? FAST_UPDATE_NAME.exec(partialBase);
+                if (!file.isFile() || (partialBase !== 'pending.json' && !update)) continue;
+                const cachedPath = path.join(this.cacheDir, file.name);
                 try {
-                    await fsp.unlink(path.join(this.cacheDir, file.name));
+                    if (obsoleteOnly) {
+                        const version = update?.[1] ?? INSTALLER_NAME.exec(JSON.parse(await fsp.readFile(cachedPath, 'utf8'))?.name ?? '')?.[1];
+                        if (!semver.valid(version) || semver.gt(version, CURRENT_VERSION)) continue;
+                    }
+                    await fsp.unlink(cachedPath);
                     removed = true;
                 } catch (error) {
-                    if (error.code !== 'ENOENT') throw error;
+                    if (error.code !== 'ENOENT' && !(obsoleteOnly && error instanceof SyntaxError)) throw error;
                 }
             }
             return removed ? 'cleared' : 'empty';
         } finally {
-            this.downloaded = null;
-            this.progress = -100;
             this.clearing = false;
-            this.announce();
+            if (!obsoleteOnly) {
+                this.downloaded = null;
+                this.progress = -100;
+                this.announce();
+            }
         }
     }
 
@@ -264,7 +364,7 @@ class ModUpdater {
                 return false;
             }
         }
-        const progress = (fraction, windowProgress) => {
+        const progress = (fraction, windowProgress = fraction < 0 ? -1 : fraction) => {
             this.progress = fraction * 100;
             onProgress(fraction, windowProgress);
         };
@@ -279,11 +379,17 @@ class ModUpdater {
         try {
             progress(-2, -1);
             await fsp.mkdir(this.cacheDir, { recursive: true });
-            await downloadInstaller(candidate, partial, progress);
+            let downloaded = await this.prepareFastUpdate(candidate, progress);
             if (getUpdateChannel() !== candidate.channel || this.available !== candidate) throw new Error('Overtone update channel changed');
-            await fsp.rename(partial, target);
-            await this.savePending(candidate);
-            this.downloaded = { path: target, asset: candidate };
+            if (!downloaded) {
+                progress(-2);
+                await downloadAsset(candidate, partial, progress);
+                if (getUpdateChannel() !== candidate.channel || this.available !== candidate) throw new Error('Overtone update channel changed');
+                await fsp.rename(partial, target);
+                downloaded = { path: target, asset: candidate };
+            }
+            await this.savePending(downloaded);
+            this.downloaded = downloaded;
             progress(1.1, -1);
             return true;
         } catch (error) {
@@ -297,17 +403,31 @@ class ModUpdater {
     }
 
     async onInstallUpdate() {
-        if (!this.isEnabled() || this.portable || this.installing || this.clearing || this.downloaded?.asset.channel !== getUpdateChannel() || !fs.existsSync(this.installerMarker))
+        if (
+            !this.isEnabled() ||
+            this.portable ||
+            this.installing ||
+            this.downloading ||
+            this.clearing ||
+            this.downloaded?.asset.channel !== getUpdateChannel() ||
+            !fs.existsSync(this.installerMarker)
+        )
             return false;
         this.installing = true;
-        const { path: installer, asset } = this.downloaded;
+        const downloaded = this.downloaded;
+        const { path: installer, asset, fast } = downloaded;
+        this.progress = -200;
         try {
+            this.announce();
             try {
-                await verifyInstaller(installer, asset);
+                await this.verifyPreparedUpdate(downloaded);
+                if (fast && (await getUpdateLayout(path.dirname(process.resourcesPath))) !== fast.manifest.layout) {
+                    throw new UpdateIntegrityError('Installed Overtone runtime differs from the ASAR update manifest');
+                }
             } catch (error) {
-                if (error instanceof InstallerIntegrityError || error.code === 'ENOENT') {
+                if (error instanceof UpdateIntegrityError || error.code === 'ENOENT') {
+                    if (fast) this.skipFastVersion = asset.version;
                     this.downloaded = null;
-                    this.progress = -100;
                     await fsp.rm(this.pendingFile, { force: true }).catch(() => {});
                 }
                 throw error;
@@ -315,13 +435,11 @@ class ModUpdater {
             if (getUpdateChannel() !== asset.channel || this.available !== asset) return false;
 
             const directory = path.dirname(process.resourcesPath);
-            await this.savePending(asset, true);
+            await this.savePending(downloaded, true);
             if (getUpdateChannel() !== asset.channel || this.available !== asset) return false;
-            const child = spawn(installer, ['/VERYSILENT', '/SUPPRESSMSGBOXES', '/NORESTART', `/DIR=${directory}`, '/OVERTONE-RESTART'], {
-                detached: true,
-                stdio: 'ignore',
-                windowsHide: true,
-            });
+            const args = ['/SILENT', '/NOCANCEL', '/NORESTART', `/DIR=${directory}`, `/OVERTONE-PID=${process.pid}`, '/OVERTONE-RESTART'];
+            if (fast) args.push('/SUPPRESSMSGBOXES');
+            const child = spawn(installer, args, { detached: true, stdio: 'ignore', windowsHide: true });
             await new Promise((resolve, reject) => {
                 child.once('spawn', resolve);
                 child.once('error', reject);
@@ -335,6 +453,7 @@ class ModUpdater {
             return false;
         } finally {
             this.installing = false;
+            this.progress = this.downloaded ? 110 : -100;
         }
     }
 }

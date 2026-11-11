@@ -982,9 +982,10 @@
                 const [pending, setPending] = pulseToastReact.useState(false);
                 const busy = pulseToastReact.useRef(false);
                 const downloading = progress >= 0 && progress <= 100;
-                const waiting = pending || progress === -200;
+                const installing = progress === -200;
+                const waiting = pending || installing;
                 const ready = progress > 100;
-                const label = downloading ? Math.floor(progress) + '%' : waiting ? 'Подождите' : portable ? 'Скачать ZIP' : ready ? 'Установить' : 'Скачать';
+                const label = installing ? 'Установка…' : downloading ? Math.floor(progress) + '%' : waiting ? 'Подождите' : portable ? 'Скачать ZIP' : ready ? 'Установить' : 'Скачать';
                 const activate = async () => {
                     if (busy.current || downloading || waiting) return;
                     busy.current = true;

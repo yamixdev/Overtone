@@ -83,6 +83,7 @@ const { throttle } = require('./lib/utils.js');
 const crypto = require('crypto');
 const fs = require('fs');
 const nodePath = require('node:path');
+const { setTimeout: delay } = require('node:timers/promises');
 const iconv = require('iconv-lite');
 
 let mainWindow = undefined;
@@ -249,6 +250,29 @@ const handleApplicationEvents = (window) => {
         exports.sendPlayerAction(window, playerActions_js_1.PlayerActions.PLAY);
     };
     window.once('closed', () => clearTimeout(startupPlaybackTimer));
+
+    let rendererReadyForUpdateCleanup = false;
+    let startupInterfaceReady = false;
+    let updateCleanupStarted = pulsesyncDevConfig_js_1.pulseSyncDevConfig.enabled;
+    let updateCleanupNoticePending = false;
+    const handleStartupUpdateCleanup = () => {
+        if (!rendererReadyForUpdateCleanup || !startupInterfaceReady || window.isDestroyed() || !window.isVisible() || window.isMinimized()) return;
+        if (updateCleanupNoticePending) {
+            updateCleanupNoticePending = false;
+            showUpdateResult(window, 'updateCacheResult', 'Кэш обновлений очищен');
+        }
+        if (updateCleanupStarted) return;
+        updateCleanupStarted = true;
+        void clearObsoleteUpdates()
+            .then((result) => {
+                if (result !== 'cleared') return;
+                updateCleanupNoticePending = true;
+                handleStartupUpdateCleanup();
+            })
+            .catch((error) => eventsLogger.warn('Could not clear obsolete Overtone updates', error));
+    };
+    window.on('show', handleStartupUpdateCleanup);
+    window.on('restore', handleStartupUpdateCleanup);
     mainWindow = window;
     registerGlobalApplicationEvents();
     addonModuleHost.register(ipcRegistry);
@@ -917,6 +941,8 @@ const handleApplicationEvents = (window) => {
         }
 
         modUpdater_js_1.getModUpdater().announce();
+        rendererReadyForUpdateCleanup = true;
+        handleStartupUpdateCleanup();
         void checkComponentUpdates(window);
 
         const version = electron_1.app.getVersion();
@@ -981,6 +1007,8 @@ const handleApplicationEvents = (window) => {
 
         isApplicationInitFinished = true;
         applicationInitFinishedAt = Date.now();
+        startupInterfaceReady = true;
+        handleStartupUpdateCleanup();
         validationNotificationsReady = true;
         showValidationErrorToast();
         pulseSyncManager_js_1.markApplicationInitFinished();
@@ -1328,6 +1356,21 @@ function showUpdateResult(window, id, message) {
     setTimeout(() => sendBasicToastDismiss(window, id, nonce), 4500).unref();
 }
 
+async function clearObsoleteUpdates() {
+    const updater = modUpdater_js_1.getModUpdater();
+    const retryDelays = [1000, 2000, 4000];
+    for (let attempt = 0; ; attempt++) {
+        const retryDelay = retryDelays[attempt];
+        try {
+            const result = await updater.clearCache({ obsoleteOnly: true });
+            if (result !== 'busy' || retryDelay === undefined) return result;
+        } catch (error) {
+            if (retryDelay === undefined || !['EACCES', 'EBUSY', 'EPERM'].includes(error.code)) throw error;
+        }
+        await delay(retryDelay, undefined, { ref: false });
+    }
+}
+
 async function checkClientUpdate(window) {
     const channel = getUpdateChannel();
     const status = channel === 'yandex' ? await updater_js_1.getUpdater().check() : await modUpdater_js_1.getModUpdater().check({ manual: true });
@@ -1344,14 +1387,24 @@ exports.checkClientUpdate = checkClientUpdate;
 
 function downloadModUpdate(window) {
     let lastProgressAt = 0;
-    return modUpdater_js_1.getModUpdater().onUpdateDownload((progress, windowProgress) => {
-        if (window.isDestroyed()) return;
-        const now = Date.now();
-        if (progress > 0 && progress < 1 && now - lastProgressAt < PROGRESS_BAR_THROTTLE_MS) return;
-        lastProgressAt = now;
-        sendProgressBarChange(window, 'modUpdateToast', progress * 100);
-        window.setProgressBar(windowProgress);
-    });
+    let downloadStarted = false;
+    return modUpdater_js_1
+        .getModUpdater()
+        .onUpdateDownload((progress, windowProgress) => {
+            if (!downloadStarted && progress === -2) {
+                downloadStarted = true;
+                void deviceInfo_js_1.logSystemMetrics(true);
+            }
+            if (window.isDestroyed()) return;
+            const now = Date.now();
+            if (progress > 0 && progress < 1 && now - lastProgressAt < PROGRESS_BAR_THROTTLE_MS) return;
+            lastProgressAt = now;
+            sendProgressBarChange(window, 'modUpdateToast', progress * 100);
+            window.setProgressBar(windowProgress);
+        })
+        .finally(() => {
+            if (downloadStarted) void deviceInfo_js_1.logSystemMetrics(true);
+        });
 }
 exports.downloadModUpdate = downloadModUpdate;
 

@@ -1,7 +1,7 @@
 const fsp = require('node:fs/promises');
 const path = require('node:path');
+const { APP_EXE: appExecutableName } = require('../../src/main/lib/overtoneAsarUpdate.js');
 
-const appExecutableName = 'Яндекс Музыка.exe';
 const electronVersion = require('electron/package.json').version;
 
 async function packageWindowsClient({ source, archive, upstreamResources, out, appVersion, includeFfmpeg }) {

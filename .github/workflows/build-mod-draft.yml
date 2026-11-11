@@ -73,7 +73,7 @@ jobs:
                   yarn test:release
                   if ($LASTEXITCODE -ne 0) { throw 'Release checks failed.' }
 
-            - name: Build the portable ZIP and Windows installer
+            - name: Build the portable ZIP, installer and compressed ASAR update
               id: build
               env:
                   OVERTONE_BUILD_VERSION: ${{ inputs.mod_version }}
@@ -110,6 +110,18 @@ jobs:
                   if-no-files-found: error
                   retention-days: 14
 
+            - name: Upload compressed ASAR update
+              uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+              with:
+                  name: windows-x64-fast-update
+                  path: |
+                      ${{ steps.build.outputs.fastArchive }}
+                      ${{ steps.build.outputs.fastManifest }}
+                      ${{ steps.build.outputs.fastInstaller }}
+                  compression-level: 0
+                  if-no-files-found: error
+                  retention-days: 14
+
             - name: Create draft release
               shell: pwsh
               env:
@@ -122,6 +134,9 @@ jobs:
                   CHECKSUM_PATH: ${{ steps.build.outputs.checksum }}
                   INSTALLER_PATH: ${{ steps.build.outputs.installer }}
                   INSTALLER_CHECKSUM_PATH: ${{ steps.build.outputs.installerChecksum }}
+                  FAST_ARCHIVE_PATH: ${{ steps.build.outputs.fastArchive }}
+                  FAST_MANIFEST_PATH: ${{ steps.build.outputs.fastManifest }}
+                  FAST_INSTALLER_PATH: ${{ steps.build.outputs.fastInstaller }}
                   NOTES_PATH: ${{ steps.build.outputs.notes }}
                   PORTABLE_ARTIFACT_URL: ${{ steps.portable_artifact.outputs.artifact-url }}
                   INSTALLER_ARTIFACT_URL: ${{ steps.installer_artifact.outputs.artifact-url }}
@@ -129,7 +144,8 @@ jobs:
               run: |
                   $releaseFlags = @('--draft')
                   if ($env:DRAFT_PRERELEASE -eq 'true') { $releaseFlags += @('--prerelease', '--latest=false') }
-                  $releaseUrl = gh release create $env:DRAFT_TAG $env:ZIP_PATH $env:CHECKSUM_PATH $env:INSTALLER_PATH $env:INSTALLER_CHECKSUM_PATH --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH @releaseFlags
+                  $releaseAssets = @($env:ZIP_PATH, $env:CHECKSUM_PATH, $env:INSTALLER_PATH, $env:INSTALLER_CHECKSUM_PATH, $env:FAST_ARCHIVE_PATH, $env:FAST_MANIFEST_PATH, $env:FAST_INSTALLER_PATH)
+                  $releaseUrl = gh release create $env:DRAFT_TAG @releaseAssets --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH @releaseFlags
                   if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
                   "[Черновик GitHub Release]($releaseUrl)" >> $env:GITHUB_STEP_SUMMARY
                   "[Скачать ZIP из GitHub Actions]($env:PORTABLE_ARTIFACT_URL)" >> $env:GITHUB_STEP_SUMMARY

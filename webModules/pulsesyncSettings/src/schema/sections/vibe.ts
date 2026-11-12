@@ -99,6 +99,14 @@ export const vibeAppearanceSchema = defineSettingsSection({
         },
         {
             type: 'toggle',
+            key: `${PREFIX}useTrackCoverColors`,
+            defaultValue: false,
+            title: 'Цвет Волны из обложки',
+            description: 'Подбирает оттенок фона Моей волны по обложке текущего трека.',
+            disabledWhen: animationDisabled,
+        },
+        {
+            type: 'toggle',
             key: `${PREFIX}useVibeWidgetColors`,
             defaultValue: false,
             title: 'Использовать альтернативную цветовую схему Волны',

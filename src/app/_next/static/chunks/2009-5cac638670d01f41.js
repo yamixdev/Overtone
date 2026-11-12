@@ -5904,6 +5904,12 @@
                         swapVibeAnimationAndWheel = usePulseSyncWaveSetting('modSettings.vibeAnimationEnhancement.swapVibeAnimationAndWheel', false),
                         hideArtistCoverOnNewWave = usePulseSyncWaveSetting('modSettings.vibeAnimationEnhancement.hideArtistCoverOnNewWave', false),
                         // for PulseSync: END read wave animation ordering and artist-cover visibility preferences
+                        // for PulseSync: BEGIN choose the current track cover as the wave palette source
+                        useTrackCoverColors = usePulseSyncWaveSetting('modSettings.vibeAnimationEnhancement.useTrackCoverColors', false),
+                        trackCoverColor = S.entityMeta?.averageColor,
+                        waveCoverColor =
+                            useTrackCoverColors && typeof trackCoverColor === 'string' && /^#[0-9a-f]{6}$/i.test(trackCoverColor) ? trackCoverColor : undefined,
+                        // for PulseSync: END choose the current track cover as the wave palette source
                         { screen: W } = (0, O.j)(),
                         V = null == W ? void 0 : W.pageIdForFrom;
                     (0, ta.u)();
@@ -6130,11 +6136,20 @@
                         (0, p.useEffect)(() => {
                             ev || ef(!1);
                         }, [ef, ev]));
+                    // for PulseSync: BEGIN use the cover color in the animated and static wave backgrounds
+                    const waveAppearance = waveCoverColor ? { ...en, color: `color-mix(in srgb, ${waveCoverColor}, black 55%)`, blendMode: undefined } : en;
                     let ew = (0, N.L)(() =>
                             I.checkExperiment(G.z.WebNextShaderFallbackEnabled, 'on')
-                                ? (0, u.jsx)(D, { className: n4().vibeAnimation, appearance: en })
-                                : (0, u.jsx)(F, { className: n4().vibeAnimation, averageColor: Z.primary, isTrackColors: ea, fallbackAppearance: en }),
+                                ? (0, u.jsx)(D, { className: n4().vibeAnimation, appearance: waveAppearance })
+                                : (0, u.jsx)(F, {
+                                      className: n4().vibeAnimation,
+                                      averageColor: Z.primary,
+                                      isTrackColors: ea,
+                                      fallbackAppearance: waveAppearance,
+                                      coverColor: waveCoverColor,
+                                  }),
                         ),
+                        // for PulseSync: END use the cover color in the animated and static wave backgrounds
                         eB = (0, j.c)(() => {
                             (M.hasPlus || h.$3, U());
                         }),

@@ -187,6 +187,7 @@ const init = () => {
             useDynamicEnergy: true,
             smoothDynamicEnergy: false,
             smoothDynamicEnergyCoefficient: 0.2,
+            useTrackCoverColors: false,
             useVibeWidgetColors: false,
             disableRendering: false,
             autoLaunchOnAppStartup: false,

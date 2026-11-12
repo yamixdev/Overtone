@@ -46,6 +46,15 @@
                 return (h + 80) % 360 || 360;
             };
             // for PulseSync: END derive wave hue from track artwork
+            // for PulseSync: BEGIN build a wave palette with the artwork hue and bounded lightness
+            const resolvePulseSyncCoverPalette = (coverColor) => {
+                if (!coverColor) return undefined;
+                const { h, s, l } = (0, k.g8)(coverColor);
+                const saturation = Math.min(78, s);
+                const lightness = Math.min(46, Math.max(24, l));
+                return { top: E(h, saturation, lightness + 8), middle: E(h, saturation, lightness), bottom: E(h, saturation, lightness - 10) };
+            };
+            // for PulseSync: END build a wave palette with the artwork hue and bounded lightness
             let w = { transparent: !0 },
                 N = (0, n.PA)((e) => {
                     let { vibeAnimationState: i, isVibeAnimationVisible: t, averageColor: n, isTrackColors: o, fallbackAppearance: r, forwardRef: d, className: _ } = e,
@@ -58,6 +67,7 @@
                         { experiments: I, sonataState: O, settings: L, vibe: pulseSyncMigration_I_3, user: pulseSyncUser } = (0, c.g)(),
                         pulseSyncAnimationVariant = resolvePulseSyncAnimationVariant(O.entityMeta),
                         pulseSyncCoverHue = resolvePulseSyncCoverHue(O.entityMeta?.averageColor) ?? resolvePulseSyncCoverHue(n),
+                        pulseSyncCoverPalette = (0, l.useMemo)(() => resolvePulseSyncCoverPalette(e.coverColor), [e.coverColor]),
                         // for PulseSync: END state for animation energy, variant and artwork hue
                         M = (0, x.U)(),
                         S = (0, h.i)(),
@@ -74,6 +84,7 @@
                     (0, y.e)({ handleLike: q, shouldCheckVibeContext: !1 });
                     // for PulseSync: BEGIN derive missing wave palette parameters from track artwork
                     const getPulseSyncAnimationSettings = () => {
+                        if (pulseSyncCoverPalette) return { customColors: pulseSyncCoverPalette };
                         if (!window.VIBE_ANIMATION_USE_VIBE_WIDGET_COLORS?.()) {
                             return { customColors: W({ averageColor: n, isTrackColors: o }) };
                         }
@@ -191,6 +202,7 @@
                         O.entityMeta?.trackParameters,
                         pulseSyncAnimationVariant,
                         pulseSyncCoverHue,
+                        pulseSyncCoverPalette,
                     ]);
                     // for PulseSync: END initialize the wave worker with mod colors, FPS, resolution and variant
                     let K = (0, s.c)(() => {
@@ -205,7 +217,18 @@
                     // for PulseSync: BEGIN apply wave animation preferences and runtime-ready updates
                     (0, l.useEffect)(() => {
                         f?.applySettings(getPulseSyncAnimationSettings());
-                    }, [n, o, O.isPlaying, O.isVibeContext, pulseSyncMigration_I_3.isShuffleVibe, f, pulseSyncUser.collectionHue, O.entityMeta?.trackParameters, pulseSyncCoverHue]),
+                    }, [
+                        n,
+                        o,
+                        O.isPlaying,
+                        O.isVibeContext,
+                        pulseSyncMigration_I_3.isShuffleVibe,
+                        f,
+                        pulseSyncUser.collectionHue,
+                        O.entityMeta?.trackParameters,
+                        pulseSyncCoverHue,
+                        pulseSyncCoverPalette,
+                    ]),
                     (0, l.useEffect)(() => {
                         if (f && f.animationVariant !== pulseSyncAnimationVariant) f.updateRuntimeSettings({ animationVariant: pulseSyncAnimationVariant });
                     }, [f, pulseSyncAnimationVariant]),
@@ -248,6 +271,7 @@
                         O.entityMeta,
                         O.entityMeta?.trackParameters,
                         pulseSyncCoverHue,
+                        pulseSyncCoverPalette,
                     ]),
                     // for PulseSync: END apply wave animation preferences and runtime-ready updates
                     // for PulseSync: BEGIN apply track hue and energy when starting the wave animation
@@ -258,7 +282,19 @@
                             ? (f?.playAnimation({ ...getPulseSyncAnimationSettings(), energy: parameters?.energy }),
                               window.VIBE_ANIMATION_DISABLE_RENDERING?.() ? N?.stop() : N?.start())
                             : (f?.idleAnimation(), N?.stop());
-                    }, [N, t, O.isPlaying, f, n, O.isVibeContext, pulseSyncMigration_I_3.isShuffleVibe, pulseSyncUser, O.entityMeta?.trackParameters, pulseSyncCoverHue]),
+                    }, [
+                        N,
+                        t,
+                        O.isPlaying,
+                        f,
+                        n,
+                        O.isVibeContext,
+                        pulseSyncMigration_I_3.isShuffleVibe,
+                        pulseSyncUser,
+                        O.entityMeta?.trackParameters,
+                        pulseSyncCoverHue,
+                        pulseSyncCoverPalette,
+                    ]),
                     // for PulseSync: END apply track hue and energy when starting the wave animation
                     (0, l.useEffect)(() => {
                         t ? null == f || f.enable() : null == f || f.disable();
@@ -313,6 +349,9 @@
                                       averageColor: i,
                                       isTrackColors: t,
                                       fallbackAppearance: n,
+                                      // for PulseSync: BEGIN forward the opted-in artwork color to the wave shader
+                                      coverColor: e.coverColor,
+                                      // for PulseSync: END forward the opted-in artwork color to the wave shader
                                       className: u,
                                   }),
                         );

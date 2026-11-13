@@ -257,8 +257,7 @@
     color: var(--ym-controls-color-secondary-text-enabled_variant);
     transition:
         background-color var(--ym-duration-transition),
-        transform var(--ym-duration-transition),
-        opacity 0.15s ease-out;
+        transform var(--ym-duration-transition);
 }
 .FullscreenVideoPlayerDesktop_closeButton__OqSFs:not(:disabled):focus-visible,
 .FullscreenVideoPlayerDesktop_closeButton__OqSFs:not(:disabled):hover {
@@ -271,22 +270,6 @@
         transition: none;
     }
 }
-/* for PulseSync: BEGIN fade branding and the collapse button in the fullscreen clip player */
-:root:has([data-pulsesync-clip-open]) .TitleBar_pulseText__FhYv {
-    color: transparent;
-}
-@media (prefers-reduced-motion: no-preference) {
-    .TitleBar_pulseText__FhYv {
-        transition: color 0.15s ease-out;
-    }
-}
-.FullscreenVideoPlayerDesktop_modalContent__YeGCV:not(:has(.VideoPlayerBarContainerDesktop_root_visible__F_7vs))
-    [data-pulsesync-clip-open]
-    .FullscreenVideoPlayerDesktop_closeButton__OqSFs:not(:hover):not(:focus-visible) {
-    opacity: 0;
-    pointer-events: none;
-}
-/* for PulseSync: END fade branding and the collapse button in the fullscreen clip player */
 .FullscreenVideoPlayerDesktop_logoLink__o92zi {
     --ym-logo-text-color: var(--ym-logo-color-primary-variant, var(--ym-logo-color-primary-text));
     color: var(--ym-logo-color-primary-variant);

@@ -1135,10 +1135,7 @@
                         children: Object.values(f.f).map((e) => (0, a.jsx)(m.c$, { id: e, label: b[e] }, e)),
                     });
                 });
-            // for PulseSync: BEGIN import the tooltip for equalizer band values
-            var Tooltip = r(94398),
-                h = r(54112),
-            // for PulseSync: END import the tooltip for equalizer band values
+            var h = r(54112),
                 v = r(88610),
                 x = r.n(v);
             let S = (e) => {
@@ -1285,45 +1282,20 @@
                                                                 f,
                                                             ),
                                                             r = Math.round(10 * e.value) / 10;
-                                                        // for PulseSync: BEGIN equalizer band value tooltip and mouse-wheel adjustment
                                                         return (0, a.jsx)(
-                                                            Tooltip.k,
+                                                            S,
                                                             {
-                                                                title: (r ?? 0).toFixed(1) + ' dB',
-                                                                children: (0, a.jsx)('div', {
-                                                                    onWheel: (evt) => {
-                                                                        const delta = (evt.deltaY / 1000) * -1;
-                                                                        if (E || !Number.isFinite(r) || !Number.isFinite(evt.deltaY)) return;
-                                                                        let value = (parseFloat(r) + parseFloat(delta)).toFixed(1);
-                                                                        D(e.key)(Math.min(Math.max(value, -12), 12));
-                                                                    },
-                                                                    children: (0, a.jsx)(
-                                                                        S,
-                                                                        {
-                                                                            isDisabled: E,
-                                                                            minValue: -12,
-                                                                            maxValue: 12,
-                                                                            value: e.value,
-                                                                            label: t,
-                                                                            onChange: D(e.key),
-                                                                            'aria-label': f(
-                                                                                {
-                                                                                    id: 'equalizer.slider-frequency-label',
-                                                                                },
-                                                                                {
-                                                                                    label: t,
-                                                                                    value: r,
-                                                                                },
-                                                                            ),
-                                                                            'data-test-id': u.Kq.equalizer.EQUALIZER_FREQUENCY_SLIDER,
-                                                                        },
-                                                                        t,
-                                                                    ),
-                                                                }),
+                                                                isDisabled: E,
+                                                                minValue: -12,
+                                                                maxValue: 12,
+                                                                value: e.value,
+                                                                label: t,
+                                                                onChange: D(e.key),
+                                                                'aria-label': f({ id: 'equalizer.slider-frequency-label' }, { label: t, value: r }),
+                                                                'data-test-id': u.Kq.equalizer.EQUALIZER_FREQUENCY_SLIDER,
                                                             },
-                                                            e.key,
+                                                            t,
                                                         );
-                                                        // for PulseSync: END equalizer band value tooltip and mouse-wheel adjustment
                                                     }),
                                                 }),
                                             ],
@@ -1465,9 +1437,6 @@
                                         return {
                                             backgroundSize: ''.concat(e, '% 100%'),
                                             '--seek-before-width': ''.concat(e, '%'),
-                                            // for PulseSync: BEGIN provide a scale for the fullscreen progress fill
-                                            '--seek-before-fraction': d > 0 ? e / 100 : 0,
-                                            // for PulseSync: END provide a scale for the fullscreen progress fill
                                             '--buffered-width': ''.concat(t, '%'),
                                         };
                                     }, [p, u, d]);
@@ -1530,111 +1499,6 @@
             })();
             var u = s.i;
             s.X;
-            // for PulseSync: BEGIN share the visual playback clock across seek bars
-            r.d(t, { useVisualPlaybackProgress: () => useVisualPlaybackProgress });
-            function useVisualPlaybackProgress(ref, { position, duration, state, trackId, scrubbing, blocked, enabled = true, slider }) {
-                const lastSample = i.useRef(null);
-                const stopAnimation = i.useRef(null);
-                const motionPreference = i.useRef(null);
-                const sliderWidth = i.useRef(0);
-                i.useLayoutEffect(() => {
-                    const element = slider?.current;
-                    if (!enabled || !element) return;
-                    sliderWidth.current = element.clientWidth;
-                    const observer = new ResizeObserver(([entry]) => {
-                        sliderWidth.current = entry.contentRect.width;
-                    });
-                    observer.observe(element);
-                    return () => observer.disconnect();
-                }, [slider, enabled]);
-
-                i.useLayoutEffect(() => {
-                    if (!enabled || !state) return;
-                    const motion = matchMedia('(prefers-reduced-motion: reduce)');
-                    motionPreference.current = motion;
-                    const invalidate = () => {
-                        lastSample.current = null;
-                        stopAnimation.current?.();
-                    };
-                    const unsubscribeStatus = state.status.onChange(invalidate);
-                    const unsubscribeSpeed = state.speed?.onChange?.(invalidate);
-                    const unsubscribeSeek = state.event?.onChange?.((event) => {
-                        if (event === 'Seeking' || event === 'Seeked' || event === 'SET_PROGRESS') invalidate();
-                    });
-                    motion.addEventListener('change', invalidate);
-                    document.addEventListener('visibilitychange', invalidate);
-                    return () => {
-                        invalidate();
-                        motionPreference.current = null;
-                        unsubscribeStatus?.();
-                        unsubscribeSpeed?.();
-                        unsubscribeSeek?.();
-                        motion.removeEventListener('change', invalidate);
-                        document.removeEventListener('visibilitychange', invalidate);
-                    };
-                }, [state, enabled]);
-
-                i.useLayoutEffect(() => {
-                    const element = ref.current;
-                    if (!element || !enabled || !state) return;
-                    const startedAt = performance.now();
-                    const previous = lastSample.current;
-                    const continuous = previous && previous.trackId === trackId && previous.duration === duration && position >= previous.position;
-                    const limit = continuous && position > previous.position ? Math.min(750, Math.max(80, (startedAt - previous.at) * 1.15)) : 0;
-                    const floor = continuous ? Math.max(position, previous.displayed) : position;
-                    const sample = { trackId, duration, position, at: startedAt, displayed: position };
-                    lastSample.current = sample;
-                    let frame;
-                    const sliderElement = slider?.current;
-
-                    const stop = () => {
-                        cancelAnimationFrame(frame);
-                        element.style.removeProperty('--overtone-progress');
-                        element.style.removeProperty('--overtone-progress-fraction');
-                        sliderElement?.style.removeProperty('--overtone-thumb-offset');
-                    };
-                    const render = (now) => {
-                        const rate = state.speed?.value ?? 1;
-                        if (
-                            document.hidden ||
-                            motionPreference.current?.matches ||
-                            blocked ||
-                            scrubbing?.current ||
-                            trackId == null ||
-                            state.status.value !== 'playing' ||
-                            state.event?.value === 'Seeking' ||
-                            !Number.isFinite(duration) ||
-                            duration <= 0 ||
-                            !Number.isFinite(position) ||
-                            !Number.isFinite(rate) ||
-                            rate <= 0
-                        ) {
-                            lastSample.current = null;
-                            stop();
-                            return;
-                        }
-                        const elapsed = Math.min(limit, Math.max(0, now - startedAt));
-                        const displayed = Math.max(0, Math.min(duration, Math.max(floor, position + (elapsed * rate) / 1000)));
-                        sample.displayed = displayed;
-                        const fraction = displayed / duration;
-                        element.style.setProperty('--overtone-progress', fraction * 100 + '%');
-                        if (sliderElement && Number(sliderElement.max) > 0) {
-                            element.style.setProperty('--overtone-progress-fraction', fraction);
-                            const nativeFraction = sliderElement.valueAsNumber / Number(sliderElement.max);
-                            sliderElement.style.setProperty('--overtone-thumb-offset', (fraction - nativeFraction) * sliderWidth.current + 'px');
-                        }
-                        if (elapsed < limit && displayed < duration) frame = requestAnimationFrame(render);
-                    };
-
-                    stopAnimation.current = stop;
-                    render(startedAt);
-                    return () => {
-                        stop();
-                        stopAnimation.current = null;
-                    };
-                }, [ref, state, trackId, scrubbing, blocked, enabled, slider, position, duration]);
-            }
-            // for PulseSync: END share the visual playback clock across seek bars
         },
         60143: (e) => {
             e.exports = {

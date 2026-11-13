@@ -1,46 +1,17 @@
 .NotificationUpdate_root__hpSQi.NotificationUpdate_important___0WHj {
     padding: var(--ym-spacer-size-xxs);
     padding-inline-start: var(--ym-spacer-size-l);
-    /* for PulseSync: BEGIN keep download progress inside the notification */
-    overflow: hidden;
-    position: relative;
-    /* for PulseSync: END keep download progress inside the notification */
 }
-/* for PulseSync: BEGIN download notification progress fill */
-.pulsesync-toast-progress {
-    background-color: rgb(255 255 255 / 0.1);
-    inset: 0;
-    pointer-events: none;
-    position: absolute;
-    transform: scaleX(var(--pulsesync-toast-progress));
-    transform-origin: left center;
-    transition: transform 0.2s ease-out, opacity 0.15s linear;
-    z-index: 1;
-}
-@media (prefers-reduced-motion: reduce) {
-    .pulsesync-toast-progress {
-        transition: none;
-    }
-}
-/* for PulseSync: END download notification progress fill */
 .NotificationUpdate_text__YylYD {
     color: var(--ym-controls-color-primary-text-enabled_variant);
 }
 .NotificationUpdate_button__F3O16 {
     min-width: 7.875rem;
-    /* for PulseSync: BEGIN keep toast controls clickable above the window drag region */
-    -webkit-app-region: no-drag;
-    z-index: 2;
-    /* for PulseSync: END keep toast controls clickable above the window drag region */
 }
 .NotificationUpdate_message__rLYpW {
     align-items: center;
     display: flex;
     justify-content: space-between;
-    /* for PulseSync: BEGIN toast width limits for download progress content */
-    max-width: min(42rem, calc(100vw - 2rem));
-    min-width: 26rem;
-    /* for PulseSync: END toast width limits for download progress content */
 }
 .ReleaseNotesModal_root__RSw1p {
     height: 100%;
@@ -129,43 +100,6 @@
     padding-inline-start: 0.1875rem;
     text-align: center;
 }
-/* for PulseSync: BEGIN style the Overtone release notes source selector and copy */
-.OvertoneReleaseNotes_dialog {
-    display: flex;
-    flex-direction: column;
-}
-.OvertoneReleaseNotes_dialog .ReleaseNotesModal_modalHeader__gp9SA {
-    display: grid;
-    flex-shrink: 0;
-    grid-template-columns: minmax(0, 1fr) auto;
-    row-gap: var(--ym-spacer-size-xs);
-}
-.OvertoneReleaseNotes_sources {
-    display: flex;
-    flex-wrap: wrap;
-    gap: var(--ym-spacer-size-xs);
-    grid-area: 2 / 1 / 3 / -1;
-}
-.OvertoneReleaseNotes_dialog .ReleaseNotesModal_modalContent__g8OTu {
-    flex: 1;
-    max-height: none;
-    min-height: 0;
-}
-.OvertoneReleaseNotes_scroll {
-    flex: 1;
-    min-height: 0;
-}
-.OvertoneReleaseNotes_date {
-    margin-block-end: var(--ym-spacer-size-xs);
-}
-.OvertoneReleaseNotes_paragraph {
-    margin: 0;
-    overflow-wrap: anywhere;
-}
-.OvertoneReleaseNotes_paragraph + .OvertoneReleaseNotes_paragraph {
-    margin-block-start: var(--ym-spacer-size-xs);
-}
-/* for PulseSync: END style the Overtone release notes source selector and copy */
 .NotificationsInitializer_toastClassName__ZVvrd {
     margin-block-end: var(--ym-spacer-size-m) !important;
 }

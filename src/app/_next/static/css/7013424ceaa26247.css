@@ -3138,6 +3138,36 @@
     overflow: hidden;
     width: 100%;
 }
+/* for PulseSync: BEGIN layer a blurred cover below the desktop player and lyrics */
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) {
+    isolation: isolate;
+    position: relative;
+}
+[data-overtone-fullscreen-cover-background] {
+    inset: 0;
+    overflow: hidden;
+    pointer-events: none;
+    position: absolute;
+    z-index: -1;
+}
+[data-overtone-fullscreen-cover-background] img {
+    filter: blur(3rem) saturate(0.85) brightness(0.28);
+    height: calc(100% + 12rem);
+    inset: -6rem;
+    object-fit: cover;
+    opacity: 0;
+    position: absolute;
+    width: calc(100% + 12rem);
+}
+[data-overtone-fullscreen-cover-background] img[data-loaded] {
+    opacity: 1;
+}
+@media (prefers-reduced-motion: no-preference) {
+    [data-overtone-fullscreen-cover-background] img {
+        transition: opacity 0.2s ease-out;
+    }
+}
+/* for PulseSync: END layer a blurred cover below the desktop player and lyrics */
 .FullscreenPlayerDesktop_notification__luD_J {
     inset-block-end: var(--ym-spacer-size-xxl);
 }
@@ -3217,6 +3247,15 @@
     transition: scrollbar-color 0.2s ease-in-out;
     width: 100%;
 }
+/* for PulseSync: BEGIN fade the queue without painting over the cover background */
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .PlayQueue_root__ponhw::before,
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .PlayQueue_root__ponhw::after {
+    content: none;
+}
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .PlayQueue_content__zIUvd {
+    mask-image: linear-gradient(transparent, black var(--play-queue-content-indent-dvh), black calc(100% - var(--play-queue-content-indent-dvh)), transparent);
+}
+/* for PulseSync: END fade the queue without painting over the cover background */
 .PlayQueue_content__zIUvd::-webkit-scrollbar-thumb {
     background-clip: content-box;
     border: 0.5rem solid transparent;
@@ -3756,3 +3795,15 @@
     inset-inline-start: 0;
     z-index: 2;
 }
+/* for PulseSync: BEGIN timed-word opacity transitions with reduced-motion support */
+
+.PulseSyncWordLyrics_word {
+    transition: opacity 0.12s linear;
+    will-change: opacity;
+}
+@media (prefers-reduced-motion: reduce) {
+    .PulseSyncWordLyrics_word {
+        transition: none;
+    }
+}
+/* for PulseSync: END timed-word opacity transitions with reduced-motion support */

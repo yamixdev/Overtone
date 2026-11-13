@@ -305,8 +305,7 @@
     grid-column: span 3;
     grid-row: 2;
     justify-self: center;
-    width: -moz-fit-content;
-    width: fit-content;
+    width: 100%;
 }
 .FullscreenPlayerDesktopControls_menuWrapper__ifxNx {
     grid-column: 1;
@@ -579,10 +578,22 @@
     margin-block-end: calc(var(--sync-lyrics-card-inset-bottom-vh));
     margin-block-end: calc(var(--sync-lyrics-card-inset-bottom-dvh));
 }
+.FullscreenPlayerDesktopContent_syncLyricsContent__H_enX {
+    --sync-lyrics-edge-fade: 5rem;
+}
 .FullscreenPlayerDesktopContent_syncLyricsContent__H_enX:after,
 .FullscreenPlayerDesktopContent_syncLyricsContent__H_enX:before {
-    height: 5rem;
+    height: var(--sync-lyrics-edge-fade);
 }
+/* for PulseSync: BEGIN fade lyrics without painting over the cover background */
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .FullscreenPlayerDesktopContent_syncLyricsContent__H_enX {
+    mask-image: linear-gradient(transparent, black var(--sync-lyrics-edge-fade), black calc(100% - var(--sync-lyrics-edge-fade)), transparent);
+}
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .FullscreenPlayerDesktopContent_syncLyricsContent__H_enX::before,
+.FullscreenPlayerDesktop_modalContent__Zs_LC:has(> [data-overtone-fullscreen-cover-background]) .FullscreenPlayerDesktopContent_syncLyricsContent__H_enX::after {
+    content: none;
+}
+/* for PulseSync: END fade lyrics without painting over the cover background */
 .FullscreenPlayerDesktopContent_syncLyricsLoader__EQ8o9 {
     margin-block-start: var(--sync-lyrics-scroller-inset-top-vh);
     margin-block-start: var(--sync-lyrics-scroller-inset-top-dvh);

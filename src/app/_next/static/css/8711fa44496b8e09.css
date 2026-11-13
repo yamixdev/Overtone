@@ -841,8 +841,7 @@
     background-color: var(--ym-slider-color-primary-progress);
     content: '';
     opacity: 0.32;
-    transform: translate3d(calc(var(--track-progress) - 100%), 0, 0);
-    transition: var(--transition-disabled, transform var(--ym-duration-transition) linear);
+    transform: translate3d(calc(var(--overtone-progress, var(--track-progress)) - 100%), 0, 0);
 }
 @media screen and (prefers-reduced-motion: reduce) {
     .ChangeTimecodeBackground_backgroundProgressbar__hT_QP:before {
@@ -863,8 +862,7 @@
     background-color: var(--ym-slider-color-primary-progress);
     content: '';
     height: 0.25rem;
-    transform: translate3d(calc(var(--track-progress) - 100%), 0, 0);
-    transition: var(--transition-disabled, transform var(--ym-duration-transition) linear);
+    transform: translate3d(calc(var(--overtone-progress, var(--track-progress)) - 100%), 0, 0);
     width: 100%;
 }
 @media screen and (prefers-reduced-motion: reduce) {
@@ -879,8 +877,9 @@
     inset-block-start: -0.25rem;
     opacity: 0;
     position: absolute;
-    transform: translate3d(var(--thumb-position), 0, 0);
-    transition: var(--transition-disabled, opacity var(--ym-duration-transition) ease, transform var(--ym-duration-transition) linear);
+    inset-inline-start: var(--overtone-progress, var(--track-progress));
+    transform: translateX(-50%);
+    transition: var(--transition-disabled, opacity var(--ym-duration-transition) ease);
     width: var(--size-thumb);
     z-index: 1;
 }

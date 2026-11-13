@@ -3824,3 +3824,32 @@
 .PaymentWidgetModal_widget__cu_gr {
     height: 100%;
 }
+/* for PulseSync: BEGIN remove bottom padding from the final native settings item */
+.Settings_item__Ksa9h:last-child {
+    padding-block-end: 0;
+}
+/* for PulseSync: END remove bottom padding from the final native settings item */
+
+/* for PulseSync: BEGIN wide player-bar and legacy wave-player grid layouts */
+
+@media only screen and (width > 1080px) {
+    .DefaultLayout_root__7J0wo.modSettings_alwaysWideBar,
+    .DefaultLayout_rootNewVibe__MSDOn.modSettings_showOldPlayerBarOnNewWave.modSettings_alwaysWideBar {
+        grid-template: 'navbar content' minmax(0, 1fr) 'playerbar playerbar' auto 'barBelow barBelow' auto / auto minmax(0, 1fr);
+    }
+}
+.modSettings_showOldPlayerBarOnNewWave.DefaultLayout_rootNewVibe__MSDOn {
+    grid-template: 'navbar content' minmax(0, 1fr) 'navbar playerbar' auto 'navbar barBelow' auto / auto minmax(0, 1fr);
+    padding-block-end: 12px;
+}
+@media only screen and (max-width: 1080px) {
+    .modSettings_showOldPlayerBarOnNewWave.DefaultLayout_rootNewVibe__MSDOn {
+        grid-template: 'navbar content' minmax(0, 1fr) 'playerbar playerbar' auto 'barBelow barBelow' auto / auto minmax(0, 1fr);
+    }
+}
+@media only screen and (max-width: 767.98px) {
+    .modSettings_showOldPlayerBarOnNewWave.DefaultLayout_rootNewVibe__MSDOn {
+        grid-template: 'content' minmax(0, 1fr) 'playerbar' auto 'barBelow' auto 'navbar' auto / minmax(0, 1fr);
+    }
+}
+/* for PulseSync: END wide player-bar and legacy wave-player grid layouts */

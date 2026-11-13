@@ -2794,6 +2794,12 @@
             "value": "Ставьте лайки будущим релизам на страницах артистов, и они появятся тут"
         }
     ],
+    "error-messages.empty-collection-waves-title": [
+        {
+            "type": 0,
+            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+        }
+    ],
     "error-messages.empty-shelf-liked-page-link": [
         {
             "type": 0,
@@ -3144,6 +3150,12 @@
         {
             "type": 0,
             "value": "Добавить трек в плейлист"
+        }
+    ],
+    "interface-actions.awake-lumen": [
+        {
+            "type": 0,
+            "value": "Пробудить Люмена"
         }
     ],
     "interface-actions.cancel": [

@@ -2602,6 +2602,12 @@
             "value": "Әртістер парақшаларындағы болашақ релиздерге лайк қойыңыз, сонда олар осында пайда болады"
         }
     ],
+    "error-messages.empty-collection-waves-title": [
+        {
+            "type": 0,
+            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+        }
+    ],
     "error-messages.empty-shelf-liked-page-link": [
         {
             "type": 0,
@@ -2952,6 +2958,12 @@
         {
             "type": 0,
             "value": "Тректі плейлиске қосу"
+        }
+    ],
+    "interface-actions.awake-lumen": [
+        {
+            "type": 0,
+            "value": "Люменді ояту"
         }
     ],
     "interface-actions.cancel": [

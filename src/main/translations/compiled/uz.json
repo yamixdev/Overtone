@@ -2634,6 +2634,12 @@
             "value": "Ijrochilarning sahifalari kelgusi relizlariga layklar bosing va ular bu yerda koʻrinadi"
         }
     ],
+    "error-messages.empty-collection-waves-title": [
+        {
+            "type": 0,
+            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+        }
+    ],
     "error-messages.empty-shelf-liked-page-link": [
         {
             "type": 0,
@@ -2976,6 +2982,12 @@
         {
             "type": 0,
             "value": "Trekni pleylistga kiritish"
+        }
+    ],
+    "interface-actions.awake-lumen": [
+        {
+            "type": 0,
+            "value": "Lyumenni uygʻotish"
         }
     ],
     "interface-actions.cancel": [

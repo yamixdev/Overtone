@@ -55,12 +55,13 @@ function describeExecutable(buffer, headerHash) {
     };
 }
 
-function verifyFastManifest(manifest, version, electronVersion, ffmpegRepository) {
+function verifyFastManifest(manifest, version, electronVersion, ffmpegRepository, yandexMusicVersion) {
     const { archive, executable } = manifest ?? {};
     const validFile = (file) => Number.isSafeInteger(file?.size) && file.size > 0 && file.size <= MAX_BYTES && SHA256.test(file.sha256);
     return (
         manifest?.schema === 1 &&
         manifest.version === version &&
+        manifest.yandexMusicVersion === yandexMusicVersion &&
         manifest.electronVersion === electronVersion &&
         manifest.ffmpegRepository === ffmpegRepository &&
         SHA256.test(manifest.layout) &&

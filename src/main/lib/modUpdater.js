@@ -66,7 +66,7 @@ function readPendingAsset(saved) {
 }
 
 function isCompatibleManifest(manifest, version) {
-    return verifyFastManifest(manifest, version, process.versions.electron, config.app?.ffmpegRepository);
+    return verifyFastManifest(manifest, version, process.versions.electron, config.app?.ffmpegRepository, config.modification.realYMVersion);
 }
 
 function selectOvertoneRelease(release, currentVersion, portable, beta = false) {

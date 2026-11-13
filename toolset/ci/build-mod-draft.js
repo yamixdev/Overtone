@@ -210,24 +210,32 @@ async function main() {
     buildInstaller(installerName);
     const installerChecksum = await writeChecksum(installer);
 
-    const fastPrefix = `Overtone-ASAR-${modVersion}-win-x64`;
-    const fastArchive = path.join(workspace, `${fastPrefix}.asar.gz`);
-    const fastManifest = path.join(workspace, `${fastPrefix}.json`);
-    const fastInstaller = path.join(workspace, `${fastPrefix}.exe`);
-    const stagedArchive = path.join(stage, 'resources', 'app.asar');
-    const headerHash = createHash('sha256').update(asar.getRawHeader(stagedArchive).headerString).digest('hex');
-    const executable = describeExecutable(await fsp.readFile(path.join(stage, appExecutableName)), headerHash);
-    const archive = { size: (await fsp.stat(stagedArchive)).size, sha256: await hashFile(stagedArchive) };
-    await pipeline(fs.createReadStream(stagedArchive), createGzip({ level: 9 }), fs.createWriteStream(fastArchive));
-    const layout = await getUpdateLayout(stage);
-    await fsp.writeFile(fastManifest, `${JSON.stringify({ schema: 1, version: modVersion, electronVersion, ffmpegRepository, layout, archive, executable })}\n`);
-    buildInstaller(fastPrefix, [
-        '/DFastUpdate=1',
-        `/DArchiveHash=${archive.sha256}`,
-        `/DArchiveSize=${archive.size}`,
-        `/DExecutableHash=${executable.sha256}`,
-        `/DExecutableSize=${executable.size}`,
-    ]);
+    const forceFullInstaller = process.env.OVERTONE_FORCE_FULL_INSTALLER === 'true';
+    const fastUpdate = {};
+    if (!forceFullInstaller) {
+        const fastPrefix = `Overtone-ASAR-${modVersion}-win-x64`;
+        const fastArchive = path.join(workspace, `${fastPrefix}.asar.gz`);
+        const fastManifest = path.join(workspace, `${fastPrefix}.json`);
+        const fastInstaller = path.join(workspace, `${fastPrefix}.exe`);
+        const stagedArchive = path.join(stage, 'resources', 'app.asar');
+        const headerHash = createHash('sha256').update(asar.getRawHeader(stagedArchive).headerString).digest('hex');
+        const executable = describeExecutable(await fsp.readFile(path.join(stage, appExecutableName)), headerHash);
+        const archive = { size: (await fsp.stat(stagedArchive)).size, sha256: await hashFile(stagedArchive) };
+        await pipeline(fs.createReadStream(stagedArchive), createGzip({ level: 9 }), fs.createWriteStream(fastArchive));
+        const layout = await getUpdateLayout(stage);
+        await fsp.writeFile(
+            fastManifest,
+            `${JSON.stringify({ schema: 1, version: modVersion, yandexMusicVersion, electronVersion, ffmpegRepository, layout, archive, executable })}\n`,
+        );
+        buildInstaller(fastPrefix, [
+            '/DFastUpdate=1',
+            `/DArchiveHash=${archive.sha256}`,
+            `/DArchiveSize=${archive.size}`,
+            `/DExecutableHash=${executable.sha256}`,
+            `/DExecutableSize=${executable.size}`,
+        ]);
+        Object.assign(fastUpdate, { fastArchive, fastManifest, fastInstaller });
+    }
 
     const tag = prerelease ? `overtone-${modVersion}` : `draft-yandex-${yandexMusicVersion}-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}`;
     const downloads = `${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/download/${encodeURIComponent(tag)}`;
@@ -240,7 +248,7 @@ async function main() {
             `1. [Установщик Windows x64 (.exe)](${downloads}/${encodeURIComponent(path.basename(installer))})`,
             `2. [Portable ZIP](${downloads}/${encodeURIComponent(path.basename(zip))})`,
             '',
-            'Файлы быстрого обновления Overtone скачивает автоматически.',
+            forceFullInstaller ? 'Для автообновления Overtone скачивает полный установщик.' : 'Файлы быстрого обновления Overtone скачивает автоматически.',
             '',
             `Яндекс Музыка **${yandexMusicVersion}** для Windows x64 с модификацией **${modName} ${modVersion}**.`,
             `Electron **${electronVersion}**.`,
@@ -263,9 +271,7 @@ async function main() {
         checksum,
         installer,
         installerChecksum,
-        fastArchive,
-        fastManifest,
-        fastInstaller,
+        ...fastUpdate,
         notes,
     };
     await fsp.appendFile(

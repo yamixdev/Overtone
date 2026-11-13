@@ -18,6 +18,10 @@ on:
                 description: Launch Electron on the runner to check startup
                 type: boolean
                 default: false
+            force_full_installer:
+                description: Require the full Windows installer for this update
+                type: boolean
+                default: false
 
 permissions:
     contents: write
@@ -73,12 +77,13 @@ jobs:
                   yarn test:release
                   if ($LASTEXITCODE -ne 0) { throw 'Release checks failed.' }
 
-            - name: Build the portable ZIP, installer and compressed ASAR update
+            - name: Build Windows release files
               id: build
               env:
                   OVERTONE_BUILD_VERSION: ${{ inputs.mod_version }}
                   OVERTONE_FFMPEG_SOURCE: ${{ inputs.ffmpeg_source }}
                   OVERTONE_ELECTRON_SMOKE_TEST: ${{ inputs.smoke_test }}
+                  OVERTONE_FORCE_FULL_INSTALLER: ${{ inputs.force_full_installer }}
               run: node toolset/ci/build-mod-draft.js
 
             - name: Upload portable ZIP
@@ -111,6 +116,7 @@ jobs:
                   retention-days: 14
 
             - name: Upload compressed ASAR update
+              if: ${{ steps.build.outputs.fastArchive != '' }}
               uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
               with:
                   name: windows-x64-fast-update
@@ -149,10 +155,14 @@ jobs:
                     "${env:ZIP_PATH}#Portable ZIP"
                     "${env:INSTALLER_CHECKSUM_PATH}#SHA-256 установщика"
                     "${env:CHECKSUM_PATH}#SHA-256 архива Portable"
-                    "${env:FAST_ARCHIVE_PATH}#Архив автообновления"
-                    "${env:FAST_MANIFEST_PATH}#Манифест автообновления"
-                    "${env:FAST_INSTALLER_PATH}#Служебный установщик автообновления"
                   )
+                  if ($env:FAST_ARCHIVE_PATH) {
+                    $releaseAssets += @(
+                      "${env:FAST_ARCHIVE_PATH}#Архив автообновления"
+                      "${env:FAST_MANIFEST_PATH}#Манифест автообновления"
+                      "${env:FAST_INSTALLER_PATH}#Служебный установщик автообновления"
+                    )
+                  }
                   $releaseUrl = gh release create $env:DRAFT_TAG @releaseAssets --repo $env:GITHUB_REPOSITORY --target $env:BUILD_SHA --title $env:DRAFT_TITLE --notes-file $env:NOTES_PATH @releaseFlags
                   if ($LASTEXITCODE -ne 0) { throw 'Draft release creation failed.' }
                   "[Черновик GitHub Release]($releaseUrl)" >> $env:GITHUB_STEP_SUMMARY

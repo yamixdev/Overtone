@@ -2582,6 +2582,9 @@
                 return value;
             }
             // for PulseSync: END Yandex Station device picker and live wave-setting subscription
+            // for PulseSync: BEGIN use the shared Wave artwork palette
+            const waveCover = i(913004);
+            // for PulseSync: END use the shared Wave artwork palette
             let iI = (0, m.PA)(() => {
                     var e, t;
                     // for PulseSync: BEGIN access experiments for the yellow wave play button preference
@@ -5911,10 +5914,8 @@
                         hideArtistCoverOnNewWave = usePulseSyncWaveSetting('modSettings.vibeAnimationEnhancement.hideArtistCoverOnNewWave', false),
                         // for PulseSync: END read wave animation ordering and artist-cover visibility preferences
                         // for PulseSync: BEGIN choose the current track cover as the wave palette source
-                        useTrackCoverColors = usePulseSyncWaveSetting('modSettings.vibeAnimationEnhancement.useTrackCoverColors', false),
-                        trackCoverColor = S.entityMeta?.averageColor,
-                        waveCoverColor =
-                            useTrackCoverColors && typeof trackCoverColor === 'string' && /^#[0-9a-f]{6}$/i.test(trackCoverColor) ? trackCoverColor : undefined,
+                        useTrackCoverColors = waveCover.useWaveCoverColorEnabled(),
+                        waveCoverPalette = waveCover.useWaveCoverPalette(S.entityMeta, S.isGenerativeContext, useTrackCoverColors),
                         // for PulseSync: END choose the current track cover as the wave palette source
                         { screen: W } = (0, O.j)(),
                         V = null == W ? void 0 : W.pageIdForFrom;
@@ -6135,7 +6136,12 @@
                         eP = E.bigCardPanel.isOpened,
                         eS = eP && B,
                         { solidColor: eI } = (0, az.x)(),
-                        eE = { '--track-color': Z.primary, '--lumen-color': null != eI ? eI : 'transparent' };
+                        // for PulseSync: BEGIN use the artwork shade behind the words panel
+                        eE = {
+                            '--track-color': waveCoverPalette ? waveCover.getWaveCoverShade(waveCoverPalette.primary) : Z.primary,
+                            '--lumen-color': eI ?? 'transparent',
+                        };
+                        // for PulseSync: END use the artwork shade behind the words panel
                     ((0, p.useEffect)(() => {
                         eN && w.getData();
                     }, [w, eN]),
@@ -6143,7 +6149,9 @@
                             ev || ef(!1);
                         }, [ef, ev]));
                     // for PulseSync: BEGIN use the cover color in the animated and static wave backgrounds
-                    const waveAppearance = waveCoverColor ? { ...en, color: `color-mix(in srgb, ${waveCoverColor}, black 55%)`, blendMode: undefined } : en;
+                    const waveAppearance = waveCoverPalette
+                        ? { ...en, color: waveCover.getWaveCoverShade(waveCoverPalette.primary), blendMode: undefined }
+                        : en;
                     let ew = (0, k.L)(() =>
                             I.checkExperiment(G.z.WebNextShaderFallbackEnabled, 'on')
                                 ? (0, u.jsx)(D, { className: n4().vibeAnimation, appearance: waveAppearance })
@@ -6152,7 +6160,7 @@
                                       averageColor: Z.primary,
                                       isTrackColors: ea,
                                       fallbackAppearance: waveAppearance,
-                                      coverColor: waveCoverColor,
+                                      coverPalette: waveCoverPalette,
                                   }),
                         ),
                         // for PulseSync: END use the cover color in the animated and static wave backgrounds

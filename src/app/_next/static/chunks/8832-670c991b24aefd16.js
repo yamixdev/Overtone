@@ -162,6 +162,134 @@
                 },
             };
         },
+        // for PulseSync: BEGIN share artwork colors between the Wave background and animation
+        913004: (_module, exports, require) => {
+            require.d(exports, {
+                useWaveCoverPalette: () => useWaveCoverPalette,
+                useWaveCoverColorEnabled: () => useWaveCoverColorEnabled,
+                getWaveCoverGradient: () => getWaveCoverGradient,
+                getWaveCoverShade: () => getWaveCoverShade,
+            });
+            const react = require(53548);
+            const coverImages = require(35412);
+            const settingKey = 'modSettings.vibeAnimationEnhancement.useTrackCoverColors';
+            const coverCache = new Map();
+            const sampleSize = 24;
+            const getEnabled = () => window.nativeSettings?.get?.(settingKey) === true;
+            const subscribe = (changed) =>
+                window.musicDesktop?.pulsesync?.settings?.onChange?.((key) => {
+                    if (key === settingKey) changed();
+                }) ?? (() => {});
+            const getServerEnabled = () => false;
+            const useWaveCoverColorEnabled = () => react.useSyncExternalStore(subscribe, getEnabled, getServerEnabled);
+            const hexColor = (value) => typeof value === 'string' && /^#[0-9a-f]{6}$/i.test(value);
+
+            function sampleCover(pixels) {
+                const buckets = new Map();
+                for (let index = 0; index < pixels.length; index += 4) {
+                    if (pixels[index + 3] < 128) continue;
+                    const r = pixels[index],
+                        g = pixels[index + 1],
+                        b = pixels[index + 2];
+                    const key = ((r >> 5) << 6) | ((g >> 5) << 3) | (b >> 5);
+                    const bucket = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };
+                    bucket.count++;
+                    bucket.r += r;
+                    bucket.g += g;
+                    bucket.b += b;
+                    buckets.set(key, bucket);
+                }
+                const colors = [...buckets.values()]
+                    .map(({ count, r, g, b }) => ({ count, rgb: [r, g, b].map((channel) => Math.round(channel / count)) }))
+                    .sort((left, right) => right.count - left.count);
+                const primary = colors[0];
+                if (!primary) return null;
+                const colorDistance = ({ rgb }) => Math.hypot(...rgb.map((value, index) => value - primary.rgb[index]));
+                const accent = colors.find((color) => color.count >= primary.count * 0.2 && colorDistance(color) >= 65) ?? primary;
+                const toHsl = ({ rgb }) => coverImages.g8('#' + rgb.map((channel) => channel.toString(16).padStart(2, '0')).join(''));
+                return { primary: toHsl(primary), accent: toHsl(accent) };
+            }
+
+            function loadPalette(url) {
+                const cached = coverCache.get(url);
+                if (cached) {
+                    coverCache.delete(url);
+                    coverCache.set(url, cached);
+                    return cached;
+                }
+                const pending = new Promise((resolve) => {
+                    const image = new Image();
+                    const finish = (palette) => {
+                        clearTimeout(timeout);
+                        image.onload = image.onerror = null;
+                        resolve(palette);
+                    };
+                    const timeout = setTimeout(() => finish(null), 5000);
+                    image.crossOrigin = 'anonymous';
+                    image.onload = () => {
+                        try {
+                            const canvas = document.createElement('canvas');
+                            canvas.width = canvas.height = sampleSize;
+                            const context = canvas.getContext('2d');
+                            context.drawImage(image, 0, 0, sampleSize, sampleSize);
+                            finish(sampleCover(context.getImageData(0, 0, sampleSize, sampleSize).data));
+                        } catch {
+                            finish(null);
+                        }
+                    };
+                    image.onerror = () => finish(null);
+                    image.src = url;
+                });
+                coverCache.set(url, pending);
+                if (coverCache.size > 32) coverCache.delete(coverCache.keys().next().value);
+                void pending.then((palette) => {
+                    if (!palette && coverCache.get(url) === pending) coverCache.delete(url);
+                });
+                return pending;
+            }
+
+            function useWaveCoverPalette(track, isGenerative, enabled) {
+                const uri = isGenerative ? track?.coverUri : track?.mainAlbum?.coverUri;
+                const average = isGenerative ? track?.averageColor : track?.mainAlbum?.averageColor ?? track?.averageColor;
+                const url = enabled && typeof uri === 'string' && uri ? coverImages.lU(uri, 100) : null;
+                const [sample, setSample] = react.useState(null);
+                react.useEffect(() => {
+                    if (!url) return;
+                    let active = true;
+                    loadPalette(url).then((palette) => {
+                        if (active && palette) setSample({ url, palette });
+                    });
+                    return () => {
+                        active = false;
+                    };
+                }, [url]);
+                return react.useMemo(() => {
+                    if (!enabled || !url) return null;
+                    if (sample?.url === url) return sample.palette;
+                    if (!hexColor(average)) return null;
+                    const primary = coverImages.g8(average);
+                    return { primary, accent: primary };
+                }, [enabled, url, sample, average]);
+            }
+
+            function getWaveCoverShade({ h, s, l }) {
+                return `hsl(${h} ${s * 0.58}% ${8 + l * 0.23}%)`;
+            }
+
+            function getWaveCoverGradient(palette, isPlaying, fallbackStops) {
+                if (!palette || !isPlaying) return fallbackStops;
+                const primary = getWaveCoverShade(palette.primary);
+                const accent = getWaveCoverShade(palette.accent);
+                return fallbackStops.map((_stop, index) => {
+                    const position = index / Math.max(1, fallbackStops.length - 1);
+                    const blend = Math.round(Math.min(0.8, position * 2) * 100);
+                    const darkness = Math.round(100 * position ** 0.75);
+                    return `color-mix(in srgb, color-mix(in srgb, ${primary}, ${accent} ${blend}%), #000 ${darkness}%)`;
+                });
+            }
+
+        },
+        // for PulseSync: END share artwork colors between the Wave background and animation
         35412: (t, e, r) => {
             'use strict';
             r.d(e, {

@@ -6872,6 +6872,9 @@
                 });
             var rE = a(20855),
                 rS = a.n(rE);
+            // for PulseSync: BEGIN use artwork gradient in the Wave layout
+            const waveCover = a(913004);
+            // for PulseSync: END use artwork gradient in the Wave layout
             let // for PulseSync: BEGIN desktop titlebar and wave layout preferences
                 rB = (0, v.PA)((e) => {
                 let t,
@@ -6920,6 +6923,10 @@
                     I =
                         n === W.Z.main.href || n === W.Z.video.href;
                 Y(K.S.Dark, I);
+                // for PulseSync: BEGIN subscribe to artwork colors on the Wave route
+                const waveCoverColorEnabled = waveCover.useWaveCoverColorEnabled();
+                const waveCoverPalette = waveCover.useWaveCoverPalette(v.entityMeta, v.isGenerativeContext, waveCoverColorEnabled && n === W.Z.main.href);
+                // for PulseSync: END subscribe to artwork colors on the Wave route
                 let w = l.isVisible || ((null == B ? void 0 : B.isVisible) && B.hasAnimationAlreadyBeenStarted),
                     j = {
                         barBelow: rS().barBelow,
@@ -6933,12 +6940,14 @@
                 if (I) {
                     var L;
                     let e = y.isShuffleVibe && v.isVibeContext;
-                    ((t = ((e) => {
-                        let { palette: t, isPlaying: a } = e;
-                        return (a ? t.primaryStops : t.primaryDarkIdleStops).reduce((e, t, a) => ((e['--vibe-gradient-stop-'.concat(a)] = t), e), {});
-                    })({ palette: (0, x.OH)(e || null == (L = v.entityMeta) ? void 0 : L.averageColor), isPlaying: v.isPlaying && !T.bigCardPanel.isOpened })),
-                        (P = rS().rootNewVibe_withBarBelow),
-                        (k = rS().rootNewVibe));
+                    // for PulseSync: BEGIN keep native gradient transitions with cover colors
+                    const nativePalette = (0, x.OH)(e || null == (L = v.entityMeta) ? void 0 : L.averageColor);
+                    const isPlaying = v.isPlaying && !T.bigCardPanel.isOpened;
+                    const coverGradient = waveCover.getWaveCoverGradient(waveCoverPalette, isPlaying, isPlaying ? nativePalette.primaryStops : nativePalette.primaryDarkIdleStops);
+                    t = Object.fromEntries(coverGradient.map((stop, index) => [`--vibe-gradient-stop-${index}`, stop]));
+                    P = rS().rootNewVibe_withBarBelow;
+                    k = rS().rootNewVibe;
+                    // for PulseSync: END keep native gradient transitions with cover colors
                 }
                 let O = (0, p.$)(
                     Z().root,

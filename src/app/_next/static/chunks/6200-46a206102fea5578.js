@@ -6944,12 +6944,12 @@
                     var L;
                     let e = y.isShuffleVibe && v.isVibeContext;
                     // for PulseSync: BEGIN keep native gradient transitions with cover colors
-                    const nativePalette = (0, x.OH)(e || null == (L = v.entityMeta) ? void 0 : L.averageColor);
+                    const nativePalette = waveCoverPalette ? null : (0, x.OH)(e || null == (L = v.entityMeta) ? void 0 : L.averageColor);
                     const isPlaying = v.isPlaying && !T.bigCardPanel.isOpened;
                     const coverGradient = waveCover.getWaveCoverGradient(
                         waveCoverPalette,
                         isPlaying,
-                        isPlaying ? nativePalette.primaryStops : nativePalette.primaryDarkIdleStops,
+                        isPlaying ? nativePalette?.primaryStops : nativePalette?.primaryDarkIdleStops,
                         isLightWave,
                     );
                     t = Object.fromEntries(coverGradient.map((stop, index) => [`--vibe-gradient-stop-${index}`, stop]));

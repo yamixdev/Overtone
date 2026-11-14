@@ -1041,7 +1041,9 @@
                             n.isGenerativeContext || (r.showFullscreenPlayerModal(), c({ to: x.AppScreen.PlayerScreen }));
                         }),
                         C = (0, k.L)(() => {
-                            if (b) return n.isGenerativeContext ? b.coverUri || tE : (null == t ? void 0 : t.coverUri) || tE;
+                            // for PulseSync: BEGIN use the same artwork for the displayed cover and Wave colors
+                            if (b) return waveCover.getWaveCoverUri(b, n.isGenerativeContext) || tE;
+                            // for PulseSync: END use the same artwork for the displayed cover and Wave colors
                         }),
                         y = (0, j.c)(() => {
                             c({ to: x.AppScreen.AlbumScreen });
@@ -6139,7 +6141,7 @@
                         // for PulseSync: BEGIN use the artwork shade behind the words panel
                         eE = {
                             '--track-color': waveCoverPalette ? waveCover.getWaveCoverShade(waveCoverPalette.primary) : Z.primary,
-                            '--lumen-color': eI ?? 'transparent',
+                            '--lumen-color': waveCoverPalette ? 'transparent' : (eI ?? 'transparent'),
                         };
                         // for PulseSync: END use the artwork shade behind the words panel
                     ((0, p.useEffect)(() => {
@@ -6150,7 +6152,12 @@
                         }, [ef, ev]));
                     // for PulseSync: BEGIN use the cover color in the animated and static wave backgrounds
                     const waveAppearance = waveCoverPalette
-                        ? { ...en, color: waveCover.getWaveCoverShade(waveCoverPalette.primary), blendMode: undefined }
+                        ? {
+                              ...en,
+                              color: waveCover.getWaveCoverShade(waveCoverPalette.primary),
+                              coverGradient: `linear-gradient(155deg, ${[waveCoverPalette.accent, waveCoverPalette.secondary, waveCoverPalette.primary].map(waveCover.getWaveCoverShade).join(', ')})`,
+                              blendMode: undefined,
+                          }
                         : en;
                     let ew = (0, k.L)(() =>
                             I.checkExperiment(G.z.WebNextShaderFallbackEnabled, 'on')

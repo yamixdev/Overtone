@@ -49,8 +49,8 @@
             // for PulseSync: BEGIN adapt the shared artwork palette to the Wave shader
             const resolvePulseSyncCoverPalette = (palette) => {
                 if (!palette) return undefined;
-                const shade = ({ h, s, l }, offset) => E(h, s * 0.75, 15 + l * 0.27 + offset);
-                return { top: shade(palette.accent, 12), middle: shade(palette.primary, 5), bottom: shade(palette.primary, -5) };
+                const shade = ({ h, s, l }, offset) => E(h, Math.min(78, s * 0.86), Math.min(52, 14 + l * 0.29 + offset));
+                return { top: shade(palette.accent, 10), middle: shade(palette.secondary, 4), bottom: shade(palette.primary, 0) };
             };
             // for PulseSync: END adapt the shared artwork palette to the Wave shader
             let w = { transparent: !0 },
@@ -82,17 +82,19 @@
                     (0, y.e)({ handleLike: q, shouldCheckVibeContext: !1 });
                     // for PulseSync: BEGIN derive missing wave palette parameters from track artwork
                     const getPulseSyncAnimationSettings = () => {
-                        if (pulseSyncCoverPalette) return { customColors: pulseSyncCoverPalette };
+                        if (pulseSyncCoverPalette) {
+                            return { customColors: pulseSyncCoverPalette, coverColors: true, snapColors: e.coverPalette.pending === true };
+                        }
                         if (!window.VIBE_ANIMATION_USE_VIBE_WIDGET_COLORS?.()) {
-                            return { customColors: W({ averageColor: n, isTrackColors: o }) };
+                            return { customColors: W({ averageColor: n, isTrackColors: o }), coverColors: false };
                         }
                         const parameters = O.entityMeta?.trackParameters;
                         const hasTrackHue = Number.isFinite(parameters?.hue);
                         const hue = hasTrackHue ? parameters.hue : pulseSyncCoverHue;
-                        if (!Number.isFinite(hue)) return { customColors: W({ averageColor: n, isTrackColors: o }) };
+                        if (!Number.isFinite(hue)) return { customColors: W({ averageColor: n, isTrackColors: o }), coverColors: false };
                         const collectionHue =
                             parameters?.userCollectionHue ?? (hasTrackHue ? pulseSyncUser.collectionHue : (pulseSyncCoverHue ?? pulseSyncUser.collectionHue));
-                        return { hue: hue === 0 ? 360 : hue, collectionHue: collectionHue === 0 ? 360 : collectionHue };
+                        return { hue: hue === 0 ? 360 : hue, collectionHue: collectionHue === 0 ? 360 : collectionHue, coverColors: false };
                     };
                     // for PulseSync: END derive missing wave palette parameters from track artwork
                     let z = (0, s.c)(() => {
@@ -382,7 +384,9 @@
                         'data-test-id': r.Kq.vibeAnimation.VIBE_ANIMATION,
                         children: (0, a.jsx)('div', {
                             className: (0, n.$)(c().fallback, { [c().fallback_colored]: i.color }),
-                            style: i.color ? { backgroundColor: i.color, maskImage: f } : void 0,
+                            // for PulseSync: BEGIN tint the fallback animation with the same cover palette
+                            style: i.color ? { backgroundColor: i.color, backgroundImage: i.coverGradient, maskImage: f } : void 0,
+                            // for PulseSync: END tint the fallback animation with the same cover palette
                             'aria-hidden': !0,
                             children: (0, a.jsx)(s._V, {
                                 src: 'reshuffle' === i.image ? 'avatars.mds.yandex.net/get-music-misc/34161/img.69f094ae5e8c2b29ab5e5346/%%' : _,

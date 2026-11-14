@@ -114,6 +114,7 @@ uniform sampler2D vDensity;
 uniform sampler2D vGlow;
 uniform vec3 vColor[6];
 uniform vec3 vColorBackground;
+uniform bool vUseCoverColors;
 void main() {
     float density = texture2D(vDensity, textureUv).r * 64.0;
     float haloDensity = texture2D(vGlow, textureUv).r * 64.0;
@@ -121,6 +122,10 @@ void main() {
     float halo = 1.0 - exp(-haloDensity * 0.05);
     float intensity = max(0.0, pow(density, 0.2) - 0.2) * opacity;
     vec3 tint = mix(vColor[0], vColor[3], textureUv.y);
+    if (vUseCoverColors) {
+        float height = textureUv.y * 2.0;
+        tint = height < 1.0 ? mix(vColor[0], vColor[1], height) : mix(vColor[1], vColor[2], height - 1.0);
+    }
     vec3 color = tint * (intensity * 0.22 + halo * 0.11);
     color *= 0.92 + 0.92 / sqrt(max(length(color), 0.001));
     // Fade at the canvas edge, keeping the widget border invisible on any background.

@@ -5,6 +5,7 @@ const DISABLE_RENDERING_KEY = `${PREFIX}disableRendering`;
 const USE_DYNAMIC_ENERGY_KEY = `${PREFIX}useDynamicEnergy`;
 const SMOOTH_DYNAMIC_ENERGY_KEY = `${PREFIX}smoothDynamicEnergy`;
 const ANIMATION_VARIANT_KEY = `${PREFIX}animationVariant`;
+const COVER_COLORS_KEY = `${PREFIX}useTrackCoverColors`;
 
 export type AnimationVariant = 'auto' | 'vibe' | 'ncs' | undefined;
 
@@ -99,11 +100,10 @@ export const vibeAppearanceSchema = defineSettingsSection({
         },
         {
             type: 'toggle',
-            key: `${PREFIX}useTrackCoverColors`,
+            key: COVER_COLORS_KEY,
             defaultValue: false,
             title: 'Цвет Волны из обложки',
-            description: 'Подбирает оттенок фона Моей волны по обложке текущего трека.',
-            disabledWhen: animationDisabled,
+            description: 'Фон и анимация берут до трёх оттенков из текущей обложки. Пока она загружается, Волна остаётся нейтральной.',
         },
         {
             type: 'toggle',
@@ -111,7 +111,7 @@ export const vibeAppearanceSchema = defineSettingsSection({
             defaultValue: false,
             title: 'Использовать альтернативную цветовую схему Волны',
             description: 'Переключение между радужным и одноцветным градиентом Волны',
-            disabledWhen: animationDisabled,
+            disabledWhen: (context) => animationDisabled(context) || context.getBoolean(COVER_COLORS_KEY),
         },
         {
             type: 'slider',

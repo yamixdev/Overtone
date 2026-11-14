@@ -2997,9 +2997,13 @@ ${blobs}
         get value() {
             return [this.r.value, this.g.value, this.b.value];
         }
-        update(t, e, i) {
+        update(t, e, i, duration = ct) {
             let s;
             ((s = 'number' == typeof e && 'number' == typeof i ? lt(t, e, i) : lt(t, 1, 0.5)), this.r.update(s[0]), this.g.update(s[1]), this.b.update(s[2]));
+            for (const [index, channel] of [this.r, this.g, this.b].entries()) {
+                channel.duration = duration || ct;
+                if (!duration) channel.currentValue = s[index];
+            }
         }
         next(t) {
             (this.r.next(t), this.g.next(t), this.b.next(t));
@@ -3031,15 +3035,15 @@ ${blobs}
         switchToDefaultHue(t) {
             this.useDefaultHue = t;
         }
-        update(t, e) {
+        update(t, e, duration) {
             if ('object' == typeof t) {
                 const { top: e, middle: i, bottom: s } = t;
-                (this.topStart.update(e.h, e.s, e.l),
-                    this.topEnd.update(e.h, e.s, e.l),
-                    this.middleStart.update(i.h, i.s, i.l),
-                    this.middleEnd.update(i.h, i.s, i.l),
-                    this.bottomStart.update(s.h, s.s, s.l),
-                    this.bottomEnd.update(s.h, s.s, s.l));
+                (this.topStart.update(e.h, e.s, e.l, duration),
+                    this.topEnd.update(e.h, e.s, e.l, duration),
+                    this.middleStart.update(i.h, i.s, i.l, duration),
+                    this.middleEnd.update(i.h, i.s, i.l, duration),
+                    this.bottomStart.update(s.h, s.s, s.l, duration),
+                    this.bottomEnd.update(s.h, s.s, s.l, duration));
             } else {
                 if ('number' != typeof t || 'number' != typeof e) throw new Error('Invalid arguments for color update');
                 {
@@ -3091,6 +3095,7 @@ ${blobs}
                     vScale: this.toValue(this.fragmentScale),
                     vColorBackground: this.toValue(this.background),
                     vColor: this.toValue(this.color.value),
+                    vUseCoverColors: this.toValue(false),
                     vBlobParams: this.toValue(this.blobParams),
                     vAudio: this.toValue([this.audioLow, this.audioMiddle, this.audioHigh]),
                     ...this.ncsAudio.uniforms,
@@ -3126,8 +3131,8 @@ ${blobs}
         updateColor(t, e) {
             this.color.update(t, e);
         }
-        updateCustomColors(t) {
-            this.color.update(t);
+        updateCustomColors(t, duration) {
+            this.color.update(t, undefined, duration);
         }
         updateBackgroundColor(t) {
             this.background = new c(t, t, t);
@@ -3441,7 +3446,12 @@ ${blobs}
                     h
                 );
             })(t);
-            (h ? this.uniforms?.updateCustomColors(h) : e && i && this.uniforms?.updateColor(e, i),
+            if (this.uniforms && typeof t.coverColors === 'boolean') {
+                this.uniforms.uniformValues.vUseCoverColors.value = t.coverColors;
+                if (t.coverColors) this.uniforms.switchToDefaultHue(false);
+            }
+            const colorDuration = t.coverColors ? (t.snapColors ? 0 : 450) : undefined;
+            (h ? this.uniforms?.updateCustomColors(h, colorDuration) : e && i && this.uniforms?.updateColor(e, i),
                 s && this.uniforms?.updateEnergy(s),
                 r && this.uniforms?.updateBackgroundColor(r),
                 n && this.uniforms?.updateBaseScale(n),

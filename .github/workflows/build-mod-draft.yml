@@ -82,6 +82,7 @@ jobs:
               env:
                   OVERTONE_BUILD_VERSION: ${{ inputs.mod_version }}
                   OVERTONE_FFMPEG_SOURCE: ${{ inputs.ffmpeg_source }}
+                  OVERTONE_FFMPEG_API_TOKEN: ${{ github.token }}
                   OVERTONE_ELECTRON_SMOKE_TEST: ${{ inputs.smoke_test }}
                   OVERTONE_FORCE_FULL_INSTALLER: ${{ inputs.force_full_installer }}
               run: node toolset/ci/build-mod-draft.js

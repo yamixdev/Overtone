@@ -7,7 +7,7 @@ const { pipeline } = require('node:stream/promises');
 const { createGzip } = require('node:zlib');
 const { setTimeout: delay } = require('node:timers/promises');
 const { createToolsetCore } = require('../core.js');
-const { OVERTONE_FFMPEG_REPOSITORY, FFMPEG_CHANNEL_TAG, readFfmpegRelease, resolveFfmpegTag } = require('../../src/main/lib/ffmpegRelease.js');
+const { OVERTONE_FFMPEG_REPOSITORY, FFMPEG_CHANNEL_TAG, readFfmpegRelease, getFfmpegReleaseTag } = require('../../src/main/lib/ffmpegRelease.js');
 const { appExecutableName, electronVersion, packageWindowsClient } = require('./package-windows-client.js');
 const { describeExecutable, getUpdateLayout, hashFile } = require('../../src/main/lib/overtoneAsarUpdate.js');
 
@@ -96,13 +96,15 @@ async function writeChecksum(filePath) {
     return checksum;
 }
 
-async function getFfmpegRepository(source) {
+async function getFfmpegRepository(source, token) {
     if (source === 'upstream') return 'foreA-adoxid/ffmpeg-builds';
     if (source !== 'overtone') throw new Error('Выберите источник FFmpeg upstream или overtone.');
 
     const repo = OVERTONE_FFMPEG_REPOSITORY;
-    const tag = await resolveFfmpegTag(repo, FFMPEG_CHANNEL_TAG);
-    const { assets } = await readFfmpegRelease(repo, tag);
+    const options = { token };
+    const channel = await readFfmpegRelease(repo, FFMPEG_CHANNEL_TAG, options);
+    const tag = getFfmpegReleaseTag(channel);
+    const { assets } = tag === FFMPEG_CHANNEL_TAG ? channel : await readFfmpegRelease(repo, tag, options);
     for (const name of ['ffmpeg-windows-x86_64.tar.gz', 'ffmpeg-windows-x86_64.sha256']) {
         if (!assets?.some((asset) => asset.name === name && asset.state === 'uploaded')) {
             throw new Error(`В релизе ${tag} отсутствует ${name}.`);
@@ -112,7 +114,8 @@ async function getFfmpegRepository(source) {
 }
 
 async function main() {
-    const { GITHUB_OUTPUT, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_REPOSITORY, GITHUB_SERVER_URL, RUNNER_TEMP } = process.env;
+    const { GITHUB_OUTPUT, GITHUB_RUN_ID, GITHUB_RUN_ATTEMPT, GITHUB_REPOSITORY, GITHUB_SERVER_URL, RUNNER_TEMP, OVERTONE_FFMPEG_API_TOKEN } = process.env;
+    delete process.env.OVERTONE_FFMPEG_API_TOKEN;
     if (process.platform !== 'win32' || process.arch !== 'x64' || !GITHUB_OUTPUT || !RUNNER_TEMP || !/^\d+$/.test(GITHUB_RUN_ID) || !/^\d+$/.test(GITHUB_RUN_ATTEMPT)) {
         throw new Error('Сборка черновика рассчитана на Windows x64 в GitHub Actions.');
     }
@@ -128,7 +131,7 @@ async function main() {
     }
     const prerelease = Boolean(semver.prerelease(modVersion));
     const ffmpegSource = process.env.OVERTONE_FFMPEG_SOURCE || 'overtone';
-    const ffmpegRepository = await getFfmpegRepository(ffmpegSource);
+    const ffmpegRepository = await getFfmpegRepository(ffmpegSource, OVERTONE_FFMPEG_API_TOKEN);
     const upstream = await core.extractUtils.fetchLatestYmYaml();
     const download = core.extractUtils.resolveYmDownloadInfo(upstream, null);
     if (

@@ -4,9 +4,9 @@ const OVERTONE_FFMPEG_REPOSITORY = 'yamixdev/Overtone';
 const FFMPEG_CHANNEL_TAG = 'ffmpeg-binaries';
 const RELEASE_POINTER = /^<!-- overtone-ffmpeg-release: (ffmpeg-v\d+\.\d+\.\d+) -->\s*$/m;
 
-async function readFfmpegRelease(repo, tag) {
+async function readFfmpegRelease(repo, tag, { token } = {}) {
     const response = await fetch(`https://api.github.com/repos/${repo}/releases/tags/${encodeURIComponent(tag)}`, {
-        headers: { Accept: 'application/vnd.github+json' },
+        headers: { Accept: 'application/vnd.github+json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
         signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) throw new Error(`Could not read FFmpeg release ${tag} (HTTP ${response.status})`);
@@ -15,10 +15,13 @@ async function readFfmpegRelease(repo, tag) {
     return release;
 }
 
-async function resolveFfmpegTag(repo, tag) {
-    if (repo !== OVERTONE_FFMPEG_REPOSITORY || tag !== FFMPEG_CHANNEL_TAG) return tag;
-    const release = await readFfmpegRelease(repo, tag);
-    return RELEASE_POINTER.exec(release.body ?? '')?.[1] ?? tag;
+function getFfmpegReleaseTag(release) {
+    return RELEASE_POINTER.exec(release.body ?? '')?.[1] ?? release.tag_name;
 }
 
-module.exports = { OVERTONE_FFMPEG_REPOSITORY, FFMPEG_CHANNEL_TAG, readFfmpegRelease, resolveFfmpegTag };
+async function resolveFfmpegTag(repo, tag) {
+    if (repo !== OVERTONE_FFMPEG_REPOSITORY || tag !== FFMPEG_CHANNEL_TAG) return tag;
+    return getFfmpegReleaseTag(await readFfmpegRelease(repo, tag));
+}
+
+module.exports = { OVERTONE_FFMPEG_REPOSITORY, FFMPEG_CHANNEL_TAG, readFfmpegRelease, getFfmpegReleaseTag, resolveFfmpegTag };

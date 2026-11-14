@@ -2,7 +2,6 @@
 Object.defineProperty(exports, '__esModule', { value: true });
 const Logger_js_1 = require('../packages/logger/Logger.js');
 const store_js_1 = require('./store.js');
-const { throttle } = require('./utils.js');
 const DiscordRPC = require('@xhayper/discord-rpc');
 const discordRichPresenceLogger = new Logger_js_1.Logger('DiscordRichPresence');
 
@@ -29,12 +28,13 @@ class convertableLink {
 const settings = () => store_js_1.get('modSettings.discordRPC') ?? {};
 
 const clientId = settings()?.applicationIDForRPC ?? '1124055337234858005';
-const SET_ACTIVITY_TIMEOUT_MS = 3000;
 const STATUS_DISPLAY_TYPES = {
     0: 0, // Name
     1: 1, // State
     2: 2, // Details
 };
+const ACTIVE_PLAYBACK_STATUSES = new Set(['playing', 'paused', 'buffering', 'loadingMediaSource', 'seeking']);
+const RATE_LIMIT_RETRY_MS = 4000;
 
 let rpc = undefined;
 let isReady = false;
@@ -54,6 +54,8 @@ let lastActivity = undefined;
 
 let activityRevision = 0;
 let activityOperationQueue = Promise.resolve();
+let pendingActivity;
+let activityRetryTimeout;
 
 const tryConnect = async (client) => {
     connectingRpc = client;
@@ -103,6 +105,8 @@ function startReconnectLoop() {
         isReady = false;
         activityRevision += 1;
         lastActivity = undefined;
+        pendingActivity = undefined;
+        clearActivityRetry();
         if (previous) await previous.destroy().catch(() => {});
         if (revision !== reconnectRevision) return;
         const client = initRPC();
@@ -153,6 +157,8 @@ const initRPC = () => {
 
         activityRevision += 1;
         lastActivity = undefined;
+        pendingActivity = undefined;
+        clearActivityRetry();
 
         discordRichPresenceLogger.info('Disconnected');
 
@@ -170,10 +176,6 @@ const initRPC = () => {
 const states = {
     playing: { icon: 'playing', name: 'Playing' },
     paused: { icon: 'paused', name: 'Paused' },
-    stopped: { icon: 'paused', name: 'Stopped' },
-    buffering: { icon: 'paused', name: 'Buffering' },
-    unknown: { icon: 'logo', name: 'Unknown' },
-    default: { icon: 'logo', name: 'Yandex Music' },
 };
 
 function string2Discord(string) {
@@ -201,18 +203,18 @@ function serializeActivity(activity) {
 
 // Проверка значительно ли отличаются временные метки.
 // Нужно для оценки целесообразности отправки нового SET_ACTIVITY.
-function isTimestampsDifferent(activityA, activityB) {
+function isTimestampsDifferent(activityA, activityB, exact) {
     return ['startTimestamp', 'endTimestamp'].some(
-        (key) => (activityA[key] === undefined) !== (activityB[key] === undefined) || Math.abs((activityA[key] ?? 0) - (activityB[key] ?? 0)) >= 750,
+        (key) => (activityA[key] === undefined) !== (activityB[key] === undefined) || Math.abs((activityA[key] ?? 0) - (activityB[key] ?? 0)) >= (exact ? 1 : 750),
     );
 }
 
-function compareActivities(newActivity) {
+function compareActivities(newActivity, exactTimestamps) {
     if (!lastActivity) return false;
 
     return (
         serializeActivity(removeTimestampsFromActivity(newActivity)) === serializeActivity(removeTimestampsFromActivity(lastActivity)) &&
-        !isTimestampsDifferent(newActivity, lastActivity)
+        !isTimestampsDifferent(newActivity, lastActivity, exactTimestamps)
     );
 }
 
@@ -302,24 +304,43 @@ function enqueueActivityOperation(operationName, operation) {
     return activityOperationQueue;
 }
 
-function updateActivity({ activityObject, revision }) {
-    if (revision !== activityRevision) {
-        discordRichPresenceLogger.debug('Skipping stale activity update');
+function clearActivityRetry() {
+    clearTimeout(activityRetryTimeout);
+    activityRetryTimeout = undefined;
+}
+
+function updateActivity(activityObject) {
+    const revision = ++activityRevision;
+    if (pendingActivity) {
+        pendingActivity.activityObject = activityObject;
+        pendingActivity.revision = revision;
         return;
     }
 
+    const update = (pendingActivity = { activityObject, revision });
     void enqueueActivityOperation('updateActivity', async () => {
-        if (revision !== activityRevision || !isReady || !rpc?.user) {
-            return;
+        if (pendingActivity !== update) return;
+        pendingActivity = undefined;
+        if (activityRetryTimeout || !isReady || !rpc?.user) return;
+
+        discordRichPresenceLogger.debug('Updating activity:', update.activityObject);
+        const client = rpc;
+        try {
+            await client.user.setActivity(update.activityObject);
+        } catch (error) {
+            if (rpc === client && isReady && error.code === DiscordRPC.RPC_ERROR_CODE.RATE_LIMITED && lastActivity) {
+                activityRetryTimeout = setTimeout(() => {
+                    activityRetryTimeout = undefined;
+                    lastActivity = undefined;
+                    sendCurrentActivity();
+                }, RATE_LIMIT_RETRY_MS);
+                return;
+            }
+            if (update.revision === activityRevision) lastActivity = undefined;
+            throw error;
         }
-
-        discordRichPresenceLogger.debug('Updating activity:', activityObject);
-
-        await rpc.user.setActivity(activityObject);
     });
 }
-
-const throttledUpdateActivity = throttle(updateActivity, SET_ACTIVITY_TIMEOUT_MS);
 
 function getAfkTimeoutMinutes(rpcSettings) {
     const value = Number(rpcSettings.afkTimeout ?? 15);
@@ -337,6 +358,8 @@ function clearAfkTimer() {
 
 function clearCurrentActivity(reason, { destroyRpc = false } = {}) {
     clearAfkTimer();
+    clearActivityRetry();
+    pendingActivity = undefined;
     const client = rpc;
     if (destroyRpc) {
         stopReconnectLoop();
@@ -362,7 +385,11 @@ function clearCurrentActivity(reason, { destroyRpc = false } = {}) {
     });
 }
 
-function sendCurrentActivity() {
+function hasActivePlayback(state) {
+    return Boolean(state.track && ACTIVE_PLAYBACK_STATUSES.has(state.status));
+}
+
+function sendCurrentActivity({ exactTimestamps = false } = {}) {
     const rpcSettings = settings();
     const isEnabled = rpcSettings.enable ?? true;
 
@@ -376,6 +403,13 @@ function sendCurrentActivity() {
     }
     if (!lastPlayingState) return;
     if (isReconnecting && !getReconnectIntervalMs(rpcSettings)) stopReconnectLoop();
+
+    if (!hasActivePlayback(lastPlayingState)) {
+        pausedState = null;
+        clearAfkTimer();
+        if (lastActivity) void clearCurrentActivity('Clearing inactive playback');
+        return;
+    }
 
     const afkTimeoutMinutes = getAfkTimeoutMinutes(rpcSettings);
     if (lastPlayingState.status === 'paused') {
@@ -420,15 +454,9 @@ function sendCurrentActivity() {
     }
     const activityObject = buildActivityObject(lastPlayingState, rpcSettings);
 
-    if (activityObject && !compareActivities(activityObject)) {
-        const revision = ++activityRevision;
-
+    if (!compareActivities(activityObject, exactTimestamps)) {
         lastActivity = activityObject;
-
-        throttledUpdateActivity({
-            activityObject,
-            revision,
-        });
+        updateActivity(activityObject);
     }
 }
 
@@ -451,12 +479,6 @@ function getPlaybackTimestamps(playingState, isGenerative) {
 }
 
 function buildActivityObject(playingState, rpcSettings) {
-    if (!playingState.track) return undefined;
-
-    if (playingState.status.startsWith('loading')) {
-        return undefined;
-    }
-
     const isGenerative = String(playingState.track.id ?? '').startsWith('generative');
 
     let title = playingState.track?.title;
@@ -491,17 +513,6 @@ function buildActivityObject(playingState, rpcSettings) {
 
     const shareArtistPath = new convertableLink(playingState.track.artists?.[0]?.id ? `artist/${playingState.track.artists?.[0]?.id}` : undefined);
 
-    let stateKey = states[playingState.status]?.icon;
-
-    let stateText = states[playingState.status]?.name;
-
-    stateText += ' on ' + (playingState.currentDevice?.info?.type ?? 'DESKTOP');
-
-    if (!states[playingState.status]) {
-        stateKey = states.unknown?.icon;
-        stateText = states.unknown?.name;
-    }
-
     let activityObject = {
         type: 2,
         statusDisplayType: STATUS_DISPLAY_TYPES[rpcSettings.statusDisplayType] ?? 0,
@@ -514,9 +525,14 @@ function buildActivityObject(playingState, rpcSettings) {
         instance: false,
     };
 
-    if (rpcSettings.showSmallIcon ?? true) {
-        activityObject.smallImageKey = stateKey;
-        activityObject.smallImageText = stateText;
+    const smallIconMode = rpcSettings.smallIconMode ?? (rpcSettings.showSmallIcon === true ? 'playback' : 'none');
+    const playbackBadge = states[playingState.status];
+    if (smallIconMode === 'logo') {
+        activityObject.smallImageKey = 'logo';
+        activityObject.smallImageText = 'Яндекс Музыка';
+    } else if (smallIconMode === 'playback' && playbackBadge) {
+        activityObject.smallImageKey = playbackBadge.icon;
+        activityObject.smallImageText = `${playbackBadge.name} on ${playingState.currentDevice?.info?.type ?? 'DESKTOP'}`;
     }
 
     if ((rpcSettings.showAlbum ?? true) && album) {
@@ -550,10 +566,11 @@ function buildActivityObject(playingState, rpcSettings) {
     return activityObject;
 }
 
-const discordRichPresence = (playingState, { remote = false } = {}) => {
+const discordRichPresence = (playingState, { remote = false, seeked = false } = {}) => {
+    if (!remote && lastPlayingStateIsRemote && settings().fromYnison && !hasActivePlayback(playingState)) return;
     lastPlayingStateIsRemote = remote;
     lastPlayingState = { ...playingState, progressSampledAt: playingState.progressSampledAt || Date.now() };
-    sendCurrentActivity();
+    sendCurrentActivity({ exactTimestamps: seeked });
 };
 
 function updatePlaybackProgress({ trackId, position, duration, sampledAt }) {

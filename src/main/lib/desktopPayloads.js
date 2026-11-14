@@ -9,13 +9,24 @@ const isRecord = (value) => {
 const isOptionalBoolean = (value) => {
     return typeof value === 'undefined' || typeof value === 'boolean';
 };
+const isPlaybackProgress = (value) =>
+    isRecord(value) && Number.isFinite(value.position) && value.position >= 0 && Number.isFinite(value.duration) && value.duration >= 0;
+const isPlaybackSampleTime = (value) => Number.isSafeInteger(value) && value > 0 && value <= Date.now();
+const isDiscordPlayback = (value) =>
+    isRecord(value) &&
+    typeof value.status === 'string' &&
+    isPlaybackSampleTime(value.sampledAt) &&
+    isOptionalBoolean(value.seeked) &&
+    (value.progress === undefined || isPlaybackProgress(value.progress)) &&
+    (value.playbackRate === undefined || (Number.isFinite(value.playbackRate) && value.playbackRate > 0));
 const isDesktopPlayerState = (value) => {
     return (
         isRecord(value) &&
         !Array.isArray(value) &&
         isOptionalBoolean(value.isPlaying) &&
         isOptionalBoolean(value.canMoveBackward) &&
-        isOptionalBoolean(value.canMoveForward)
+        isOptionalBoolean(value.canMoveForward) &&
+        (value.discordPlayback === undefined || isDiscordPlayback(value.discordPlayback))
     );
 };
 const isDesktopTheme = (value) => {
@@ -27,13 +38,8 @@ const isDiscordPlaybackProgress = (value) =>
     typeof value.trackId === 'string' &&
     value.trackId.length > 0 &&
     value.trackId.length <= 128 &&
-    Number.isFinite(value.position) &&
-    value.position >= 0 &&
-    Number.isFinite(value.duration) &&
-    value.duration >= 0 &&
-    Number.isSafeInteger(value.sampledAt) &&
-    value.sampledAt > 0 &&
-    value.sampledAt <= Date.now();
+    isPlaybackProgress(value) &&
+    isPlaybackSampleTime(value.sampledAt);
 const PLAYBACK_TIMING_KEYS = new Set(['entityHooksMs', 'mediaSourceMs', 'mediaHooksMs', 'preloadHooksMs', 'preparationWaitMs', 'canplayMs', 'playMs']);
 const isDesktopPlaybackDiagnostic = (value) => {
     if (!isRecord(value) || Array.isArray(value)) return false;

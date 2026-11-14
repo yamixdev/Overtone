@@ -6920,9 +6920,12 @@
                             return null == (e = d.list) ? void 0 : e.barBelow;
                         }
                     }),
-                    I =
-                        n === W.Z.main.href || n === W.Z.video.href;
-                Y(K.S.Dark, I);
+                    I = n === W.Z.main.href || n === W.Z.video.href;
+                // for PulseSync: BEGIN respect the profile theme on the Wave route
+                const { theme: waveTheme } = (0, G.W)();
+                const isLightWave = n === W.Z.main.href && waveTheme === K.S.Light;
+                Y(K.S.Dark, n === W.Z.video.href);
+                // for PulseSync: END respect the profile theme on the Wave route
                 // for PulseSync: BEGIN subscribe to artwork colors on the Wave route
                 const waveCoverColorEnabled = waveCover.useWaveCoverColorEnabled();
                 const waveCoverPalette = waveCover.useWaveCoverPalette(v.entityMeta, v.isGenerativeContext, waveCoverColorEnabled && n === W.Z.main.href);
@@ -6943,7 +6946,12 @@
                     // for PulseSync: BEGIN keep native gradient transitions with cover colors
                     const nativePalette = (0, x.OH)(e || null == (L = v.entityMeta) ? void 0 : L.averageColor);
                     const isPlaying = v.isPlaying && !T.bigCardPanel.isOpened;
-                    const coverGradient = waveCover.getWaveCoverGradient(waveCoverPalette, isPlaying, isPlaying ? nativePalette.primaryStops : nativePalette.primaryDarkIdleStops);
+                    const coverGradient = waveCover.getWaveCoverGradient(
+                        waveCoverPalette,
+                        isPlaying,
+                        isPlaying ? nativePalette.primaryStops : nativePalette.primaryDarkIdleStops,
+                        isLightWave,
+                    );
                     t = Object.fromEntries(coverGradient.map((stop, index) => [`--vibe-gradient-stop-${index}`, stop]));
                     P = rS().rootNewVibe_withBarBelow;
                     k = rS().rootNewVibe;
@@ -6958,6 +6966,9 @@
                         [P]: w,
                         [rS().withRedAlert]: l.isVisible,
                         [Z().root_withAxeBanner]: _.isVisible,
+                        // for PulseSync: BEGIN scope the light Wave surfaces to the main route
+                        Overtone_waveLight: isLightWave,
+                        // for PulseSync: END scope the light Wave surfaces to the main route
                         modSettings_alwaysWideBar: window.ALWAYS_WIDE_BAR?.(),
                         modSettings_showOldPlayerBarOnNewWave: window.SHOW_OLD_PLAYER_BAR_ON_NEW_WAVE?.(),
                     },

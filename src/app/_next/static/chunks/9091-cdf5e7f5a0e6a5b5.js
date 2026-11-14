@@ -1247,13 +1247,15 @@
                             .catch((e) => {
                                 this.hooks.afterError.promise(e);
                             })
+                            // for PulseSync: BEGIN identify the entity that owns the active media clock
                             .finally(() =>
-                                this.corePlay({ source: e }).then(() => {
+                                this.corePlay({ source: e }, t).then(() => {
                                     this.hooks.afterMediaStartPlaying.promise().catch((e) => {
                                         this.hooks.afterError.promise(e);
                                     });
                                 }),
                             ),
+                            // for PulseSync: END identify the entity that owns the active media clock
                     );
                 }
                 setProgress(e) {
@@ -1330,7 +1332,9 @@
                     }
                     return Promise.resolve();
                 }
-                corePlay(e) {
+                // for PulseSync: BEGIN identify the entity that owns the active video clock
+                corePlay(e, entity) {
+                    this.pulseSyncPlaybackEntity = entity;
                     return (
                         (this.state.status.value = o.BUFFERING),
                         this.core.play(e).catch((e) => {
@@ -1338,6 +1342,7 @@
                         })
                     );
                 }
+                // for PulseSync: END identify the entity that owns the active video clock
                 getMediaSource(e) {
                     return ((this.state.status.value = o.LOADING_MEDIA_SOURCE), this.mediaProvider.getMediaSource(e));
                 }
@@ -1551,7 +1556,9 @@
                     }
                     if (diagnostic) diagnostic.timings.mediaHooksMs = performance.now() - hooksStarted;
                     if (requestId !== this.playRequestId) return;
-                    await this.corePlay({ source: mediaSource, positionSec, diagnostic });
+                    // for PulseSync: BEGIN associate the audio clock with its entity at startup
+                    await this.corePlay({ source: mediaSource, positionSec, diagnostic }, entity);
+                    // for PulseSync: END associate the audio clock with its entity at startup
                     if (requestId !== this.playRequestId) return;
                     const retiredAudio = this.pulseSyncRetiredAudio;
                     if (retiredAudio) {
@@ -1594,11 +1601,14 @@
                         this.hooks.afterError.promise(error);
                     }
                     if (requestId !== this.playRequestId) return;
-                    if ([o.PLAYING, o.MEDIA_ELEMENT_ERROR, o.BUFFERING, o.LOADING_MEDIA_SOURCE].includes(status)) await this.corePlay({ source, positionSec });
+                    // for PulseSync: BEGIN keep the entity associated with its reloaded audio clock
+                    if ([o.PLAYING, o.MEDIA_ELEMENT_ERROR, o.BUFFERING, o.LOADING_MEDIA_SOURCE].includes(status)) await this.corePlay({ source, positionSec }, e);
                     else {
+                        this.pulseSyncPlaybackEntity = e;
                         this.core.setSrc({ source, positionSec });
                         this.state.status.value = status;
                     }
+                    // for PulseSync: END keep the entity associated with its reloaded audio clock
                     if (requestId !== this.playRequestId) return;
                     // for PulseSync: BEGIN restore retired audio state after source reload
                     const retiredAudio = this.pulseSyncRetiredAudio;
@@ -1658,9 +1668,10 @@
                             throw new w('Core stop error', { code: c.STOP, cause: e });
                         });
                 }
-                // for PulseSync: BEGIN preserve cancellation errors without marking playback as failed
-                corePlay(e) {
+                // for PulseSync: BEGIN preserve cancelled requests and identify the entity that owns the audio clock
+                corePlay(e, entity) {
                     const requestId = this.playRequestId;
+                    this.pulseSyncPlaybackEntity = entity;
                     return (
                         (this.state.status.value = o.BUFFERING),
                         this.core.play(e).catch((e) => {
@@ -1669,7 +1680,7 @@
                         })
                     );
                 }
-                // for PulseSync: END preserve cancellation errors without marking playback as failed
+                // for PulseSync: END preserve cancelled requests and identify the entity that owns the audio clock
                 getMediaSource(e) {
                     return super.getMediaSource(e).catch((e) => {
                         throw (

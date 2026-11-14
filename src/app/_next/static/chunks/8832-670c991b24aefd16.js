@@ -186,11 +186,15 @@
 
             function sampleCover(pixels) {
                 const buckets = new Map();
+                let opaquePixels = 0;
+                let lumaSum = 0;
                 for (let index = 0; index < pixels.length; index += 4) {
                     if (pixels[index + 3] < 128) continue;
                     const r = pixels[index],
                         g = pixels[index + 1],
                         b = pixels[index + 2];
+                    opaquePixels++;
+                    lumaSum += 0.2126 * r + 0.7152 * g + 0.0722 * b;
                     const key = ((r >> 5) << 6) | ((g >> 5) << 3) | (b >> 5);
                     const bucket = buckets.get(key) ?? { count: 0, r: 0, g: 0, b: 0 };
                     bucket.count++;
@@ -202,12 +206,22 @@
                 const colors = [...buckets.values()]
                     .map(({ count, r, g, b }) => ({ count, rgb: [r, g, b].map((channel) => Math.round(channel / count)) }))
                     .sort((left, right) => right.count - left.count);
-                const primary = colors[0];
-                if (!primary) return null;
-                const colorDistance = ({ rgb }) => Math.hypot(...rgb.map((value, index) => value - primary.rgb[index]));
-                const accent = colors.find((color) => color.count >= primary.count * 0.2 && colorDistance(color) >= 65) ?? primary;
                 const toHsl = ({ rgb }) => coverImages.g8('#' + rgb.map((channel) => channel.toString(16).padStart(2, '0')).join(''));
-                return { primary: toHsl(primary), accent: toHsl(accent) };
+                const dominant = colors[0];
+                if (!dominant) return null;
+                const differsFrom = (base, color) => Math.hypot(...color.rgb.map((value, index) => value - base.rgb[index])) >= 65;
+                const chromaticColors = colors.filter(({ rgb }) => Math.max(...rgb) - Math.min(...rgb) >= 24);
+                const chromaticPixels = chromaticColors.reduce((sum, color) => sum + color.count, 0);
+                const coverHasColor = chromaticPixels >= opaquePixels * 0.08;
+                const primary = coverHasColor ? chromaticColors[0] : dominant;
+                const primaryHsl = toHsl(primary);
+                const accent = colors.find((color) => color.count >= primary.count * 0.2 && differsFrom(primary, color)) ?? primary;
+                const accentHsl = toHsl(accent);
+                return {
+                    primary: primaryHsl,
+                    accent: coverHasColor && !chromaticColors.includes(accent) ? { ...accentHsl, h: primaryHsl.h, s: primaryHsl.s * 0.65 } : accentHsl,
+                    backgroundLightness: (100 * lumaSum) / (255 * opaquePixels),
+                };
             }
 
             function loadPalette(url) {
@@ -276,14 +290,32 @@
                 return `hsl(${h} ${s * 0.58}% ${8 + l * 0.23}%)`;
             }
 
-            function getWaveCoverGradient(palette, isPlaying, fallbackStops) {
+            function getWaveCoverGradient(palette, isPlaying, fallbackStops, isLight = false) {
+                if (isLight) {
+                    const surface = '#f5f4f1';
+                    if (!isPlaying) return fallbackStops.map(() => surface);
+                    const tintColor = ({ h, s, l }) => `hsl(${h} ${Math.min(65, s)}% ${l}%)`;
+                    const primary = palette && tintColor(palette.primary);
+                    const accent = palette && tintColor(palette.accent);
+                    return fallbackStops.map((stockColor, index) => {
+                        const position = index / Math.max(1, fallbackStops.length - 1);
+                        const tint = Math.round(20 * (1 - position) ** 1.35);
+                        const color = palette ? `color-mix(in srgb, ${primary}, ${accent} ${Math.round(80 * position)}%)` : stockColor;
+                        return `color-mix(in srgb, ${surface}, ${color} ${tint}%)`;
+                    });
+                }
                 if (!palette || !isPlaying) return fallbackStops;
-                const primary = getWaveCoverShade(palette.primary);
-                const accent = getWaveCoverShade(palette.accent);
+                const coverLightness = palette.backgroundLightness ?? palette.primary.l;
+                const backgroundShade = ({ h, s, l }) => {
+                    const lightness = Math.min(37 - 0.09 * s, 10 + 0.16 * coverLightness + 0.13 * l);
+                    return `hsl(${h} ${(s * 0.6).toFixed(1)}% ${lightness.toFixed(1)}%)`;
+                };
+                const primary = backgroundShade(palette.primary);
+                const accent = backgroundShade(palette.accent);
                 return fallbackStops.map((_stop, index) => {
                     const position = index / Math.max(1, fallbackStops.length - 1);
-                    const blend = Math.round(Math.min(0.8, position * 2) * 100);
-                    const darkness = Math.round(100 * position ** 0.75);
+                    const blend = Math.round(Math.min(0.85, position * 2.5) * 100);
+                    const darkness = Math.round(100 * position ** 1.65);
                     return `color-mix(in srgb, color-mix(in srgb, ${primary}, ${accent} ${blend}%), #000 ${darkness}%)`;
                 });
             }

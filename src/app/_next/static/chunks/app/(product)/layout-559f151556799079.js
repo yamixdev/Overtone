@@ -483,12 +483,19 @@
                         a.concat(i)
                     );
                 },
+                // for PulseSync: BEGIN fit the experiment dropdown inside the scrollable list
+                EXPERIMENT_MENU_GAP = 8,
+                // for PulseSync: END fit the experiment dropdown inside the scrollable list
                 settingBarWithDropdown = (e) => {
-                    let { title: t, description: a, onChange: i, value: n, options: o, direction: l = 'bottom', disabled: u = !1, onOpen: d } = e,
+                    let { title: t, description: a, onChange: i, value: n, options: o, disabled: u = !1, onOpen: d } = e,
                         [c, h] = s.useState(!1),
                         [v, y] = s.useState(160),
                         [p, m] = s.useState(!1),
                         f = s.useRef(null),
+                        // for PulseSync: BEGIN track the dropdown placement
+                        menuRef = s.useRef(null),
+                        [placement, setPlacement] = s.useState({ direction: 'bottom', maxHeight: void 0 }),
+                        // for PulseSync: END track the dropdown placement
                         g = o.find((e) => e.value === n);
                     return (
                         s.useEffect(() => {
@@ -526,6 +533,44 @@
                         s.useEffect(() => {
                             c && m(!0);
                         }, [c]),
+                        // for PulseSync: BEGIN position the dropdown within the visible list area
+                        s.useLayoutEffect(() => {
+                            const button = f.current;
+                            const menu = menuRef.current;
+                            const list = button?.closest('.PulseSync_experimentsListScroll');
+                            if (!p || !menu || !list) return;
+                            const updatePlacement = () => {
+                                if (window.getComputedStyle(menu).position !== 'absolute') return;
+                                const bounds = list.getBoundingClientRect();
+                                const anchor = button.getBoundingClientRect();
+                                const top = Math.max(0, bounds.top + list.clientTop);
+                                const bottom = Math.min(window.innerHeight, bounds.top + list.clientTop + list.clientHeight);
+                                if (anchor.bottom <= top || anchor.top >= bottom) {
+                                    h(!1);
+                                    return;
+                                }
+                                const above = anchor.top - top - EXPERIMENT_MENU_GAP;
+                                const below = bottom - anchor.bottom - EXPERIMENT_MENU_GAP;
+                                const menuHeight = menu.scrollHeight + menu.offsetHeight - menu.clientHeight;
+                                const direction = below >= menuHeight || below >= above ? 'bottom' : 'top';
+                                const maxHeight = Math.max(0, Math.floor(direction === 'bottom' ? below : above));
+                                setPlacement((previous) =>
+                                    previous.direction === direction && previous.maxHeight === maxHeight ? previous : { direction, maxHeight },
+                                );
+                            };
+                            updatePlacement();
+                            list.addEventListener('scroll', updatePlacement, { passive: true });
+                            window.addEventListener('resize', updatePlacement);
+                            const observer = new ResizeObserver(updatePlacement);
+                            observer.observe(list);
+                            observer.observe(button);
+                            return () => {
+                                observer.disconnect();
+                                list.removeEventListener('scroll', updatePlacement);
+                                window.removeEventListener('resize', updatePlacement);
+                            };
+                        }, [p, o]),
+                        // for PulseSync: END position the dropdown within the visible list area
                         s.useEffect(() => {
                             if (c || !p) return;
                             let e = setTimeout(() => {
@@ -569,15 +614,19 @@
                                         (null == g ? void 0 : g.label) || 'Select...',
                                         p &&
                                             (0, r.jsx)('ul', {
+                                                // for PulseSync: BEGIN apply the measured dropdown placement
+                                                ref: menuRef,
                                                 role: 'menu',
                                                 className: 'settingBarWithDropdown_menu'.concat(c ? '' : ' settingBarWithDropdown_menu__closed'),
                                                 style: {
                                                     width: ''.concat(v, 'px'),
-                                                    top: 'bottom' === l ? '120%' : 'unset',
-                                                    bottom: 'top' === l ? '120%' : 'unset',
-                                                    '--settingBarWithDropdown-offset-y': 'bottom' === l ? '-6px' : '6px',
-                                                    '--settingBarWithDropdown-origin': 'bottom' === l ? 'top right' : 'bottom right',
+                                                    maxHeight: placement.maxHeight,
+                                                    [placement.direction]: 'unset',
+                                                    [placement.direction === 'bottom' ? 'top' : 'bottom']: `calc(100% + ${EXPERIMENT_MENU_GAP}px)`,
+                                                    '--settingBarWithDropdown-offset-y': placement.direction === 'bottom' ? '-6px' : '6px',
+                                                    '--settingBarWithDropdown-origin': placement.direction === 'bottom' ? 'top right' : 'bottom right',
                                                 },
+                                                // for PulseSync: END apply the measured dropdown placement
                                                 children: o.map((e) =>
                                                     (0, r.jsxs)(
                                                         'li',
@@ -1098,6 +1147,7 @@
                         c = (0, s.useRef)(i);
                     ((c.current = i),
                         (0, s.useEffect)(() => {
+                            // for PulseSync: BEGIN read native and raw mock rules in the dev panel
                             e.isOpened &&
                                 o(
                                     ((e) => {
@@ -1108,8 +1158,9 @@
                                         } catch (e) {
                                             return [];
                                         }
-                                    })(a.get(M.L, !1)),
+                                    })(a.get(M.L) ?? a.get(M.L, !1)),
                                 );
+                            // for PulseSync: END read native and raw mock rules in the dev panel
                         }, [e.isOpened, a]));
                     let h = (0, s.useCallback)(() => c.current, []),
                         v = (0, s.useCallback)(() => {
@@ -3557,8 +3608,28 @@
         62798: (e, t, a) => {
             'use strict';
             a.d(t, { SonataProvider: () => sg });
+            // for PulseSync: BEGIN sample the active track clock for Discord
+            function readDiscordPlayback(state, entity) {
+                const { playerState } = state;
+                const status = playerState.status.value;
+                const sampledAt = Date.now();
+                if (!entity || !['playing', 'paused', 'buffering', 'loadingMediaSource'].includes(status)) return { status, sampledAt };
+                const currentPlayer = state.currentMediaPlayer.value;
+                const mediaPlayer = currentPlayer?.currentMediaPlayer ?? currentPlayer;
+                if (mediaPlayer?.pulseSyncPlaybackEntity !== entity) return { status: 'loadingMediaSource', sampledAt };
+
+                const audio = mediaPlayer?.currentAudioElement?.value;
+                if (audio?.seeking && status === 'playing') return { status: 'seeking', sampledAt };
+                if (audio && audio.readyState < HTMLMediaElement.HAVE_METADATA) return { status: status === 'paused' ? status : 'buffering', sampledAt };
+                const position = audio ? audio.currentTime : playerState.progress.value.position;
+                const duration = audio ? audio.duration : playerState.progress.value.duration;
+                const progress = Number.isFinite(position) && position >= 0 ? { position, duration: Number.isFinite(duration) && duration > 0 ? duration : 0 } : undefined;
+                const rate = audio?.playbackRate ?? playerState.speed.value;
+                return { status, progress, sampledAt, playbackRate: Number.isFinite(rate) && rate > 0 ? rate : undefined };
+            }
+            // for PulseSync: END sample the active track clock for Discord
             // for PulseSync: BEGIN report player state, actions, queue neighbors and volume to the desktop bridge
-            function reportPulseSyncPlayerState(player) {
+            function reportPulseSyncPlayerState(player, seeked = false) {
                 if (!player) return;
                 const state = player.state;
                 const queue = state.queueState;
@@ -3570,6 +3641,7 @@
                 const actions = state.currentContext.value?.availableActions;
                 const previousIndex = index > 0 ? (order?.[index - 1] ?? index - 1) : null;
                 const nextIndex = index + 1 < (entities?.length ?? 0) ? (order?.[index + 1] ?? index + 1) : null;
+                const discordPlayback = readDiscordPlayback(state, entity);
                 window.musicDesktop?.player.reportState({
                     status: state.playerState.status.value,
                     isPlaying: state.playerState.status.value === 'playing',
@@ -3577,8 +3649,9 @@
                     canMoveForward: actions?.moveForward?.value,
                     track,
                     progress: state.playerState.progress.value,
-                    progressSampledAt: Date.now(),
+                    progressSampledAt: discordPlayback.sampledAt,
                     playbackRate: state.playerState.speed.value,
+                    discordPlayback: { ...discordPlayback, seeked },
                     availableActions: {
                         moveBackward: actions?.moveBackward?.value,
                         moveForward: actions?.moveForward?.value,
@@ -3596,6 +3669,7 @@
                     nextTrack: nextIndex == null ? void 0 : entities?.[nextIndex]?.entity?.data?.meta,
                     volume: state.playerState.exponentVolume.value,
                 });
+                return discordPlayback;
             }
             // for PulseSync: END report player state, actions, queue neighbors and volume to the desktop bridge
             var r,
@@ -14464,6 +14538,8 @@
                                 let active = true;
                                 let reportScheduled = false;
                                 let lastReportAt = 0;
+                                let seekCompleted = false;
+                                let awaitingDiscordClock = false;
                                 const report = () => {
                                     if (reportScheduled) return;
                                     reportScheduled = true;
@@ -14471,7 +14547,10 @@
                                         reportScheduled = false;
                                         if (!active) return;
                                         lastReportAt = performance.now();
-                                        reportPulseSyncPlayerState(t);
+                                        const seeked = seekCompleted;
+                                        seekCompleted = false;
+                                        const playback = reportPulseSyncPlayerState(t, seeked);
+                                        awaitingDiscordClock = t.state.playerState.status.value === 'playing' && (playback.status !== 'playing' || !playback.progress);
                                     });
                                 };
                                 const cleanups = [];
@@ -14501,17 +14580,29 @@
                                     subscribe(observable);
                                 subscribe(t.state.playerState.progress, () => {
                                     const now = performance.now();
-                                    if (!active || reportScheduled || t.state.playerState.status.value !== 'playing' || now - lastReportAt < 5000) return;
+                                    if (!active || reportScheduled || t.state.playerState.status.value !== 'playing') return;
+                                    if (!awaitingDiscordClock && now - lastReportAt < 5000) return;
                                     if (window.nativeSettings?.get?.('modSettings.discordRPC.enable') === false) return;
-                                    const trackId = t.state.queueState.currentEntity.value?.entity?.data?.meta?.id;
+                                    const entity = t.state.queueState.currentEntity.value?.entity;
+                                    const trackId = entity?.data?.meta?.id;
                                     if (trackId == null) return;
-                                    const { position, duration } = t.state.playerState.progress.value;
+                                    const playback = readDiscordPlayback(t.state, entity);
+                                    if (playback.status !== 'playing' || !playback.progress) return;
+                                    if (awaitingDiscordClock) {
+                                        report();
+                                        return;
+                                    }
                                     lastReportAt = now;
-                                    window.musicDesktop?.player.reportDiscordProgress?.({ trackId: String(trackId), position, duration, sampledAt: Date.now() });
+                                    window.musicDesktop?.player.reportDiscordProgress?.({
+                                        trackId: String(trackId),
+                                        ...playback.progress,
+                                        sampledAt: playback.sampledAt,
+                                    });
                                 });
                                 subscribe(t.state.playerState.event, () => {
                                     const event = t.state.playerState.event.value;
-                                    if (event === 'Seeked' || event === 'SET_PROGRESS' || event === L.Iu?.SET_PROGRESS) report();
+                                    if (event === L.Iu.SET_PROGRESS) seekCompleted = true;
+                                    if (event === L.Iu.SETTING_PROGRESS || event === L.Iu.SET_PROGRESS) report();
                                 });
                                 // for PulseSync: END subscribe to player and queue changes for desktop state reporting
                                 // for PulseSync WebHost: BEGIN handle desktop current-track requests and expose the player instance to addons

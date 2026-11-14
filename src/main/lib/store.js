@@ -128,7 +128,7 @@ const init = () => {
             applicationIDForRPC: '1124055337234858005',
             statusDisplayType: 0,
             showButtons: true,
-            showSmallIcon: false,
+            smallIconMode: store.get('modSettings.discordRPC.showSmallIcon') === true ? 'playback' : 'none',
             showAlbum: true,
             showVersion: true,
             overrideDeepLinksExperiment: false,

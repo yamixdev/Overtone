@@ -82,11 +82,15 @@ export const discordRpcSchema = defineSettingsSection({
             disabledWhen: discordDisabled,
         },
         {
-            type: 'toggle',
-            key: `${DISCORD_PREFIX}showSmallIcon`,
-            defaultValue: false,
-            title: 'Отображать маленькую иконку',
-            description: 'Отображать ли иконку статуса воспроизведения (Playing, Paused)',
+            type: 'select',
+            key: `${DISCORD_PREFIX}smallIconMode`,
+            defaultValue: 'none',
+            title: 'Значок на обложке',
+            options: [
+                { value: 'none', label: 'Без значка' },
+                { value: 'logo', label: 'Логотип Яндекс Музыки' },
+                { value: 'playback', label: 'Статус воспроизведения' },
+            ],
             disabledWhen: discordDisabled,
         },
         {

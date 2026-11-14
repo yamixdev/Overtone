@@ -1089,6 +1089,11 @@ const handleApplicationEvents = (window) => {
             normalizeSubstitutedTrack(data?.previousTrack);
             normalizeSubstitutedTrack(data?.nextTrack);
 
+            if (data.discordPlayback) {
+                const { status, progress, sampledAt, playbackRate, seeked } = data.discordPlayback;
+                discordRichPresence_js_1.discordRichPresence({ track: data.track, status, progress, progressSampledAt: sampledAt, playbackRate }, { seeked });
+            }
+
             (0, tray_js_1.updateTrayMenu)(window);
             const isActiveState = ['paused', 'playing'].includes(data?.status);
             const isPlayable = isPlayerReady && data.status !== 'idle' && isActiveState;
@@ -1096,9 +1101,6 @@ const handleApplicationEvents = (window) => {
             MiniPlayer.updatePlayerState(structuredClone(data));
             (0, taskBarExtension_js_1.onPlayerStateChange)(window, data);
 
-            if (isPlayerReady && (isActiveState || data.status === 'buffering')) {
-                (0, discordRichPresence_js_1.discordRichPresence)(structuredClone(data));
-            }
             if (isPlayable) {
                 (0, scrobbleManager_js_1.handlePlayingStateEvent)(structuredClone(data));
                 (0, pulseSyncManager_js_1.updatePlayerState)(structuredClone(data));

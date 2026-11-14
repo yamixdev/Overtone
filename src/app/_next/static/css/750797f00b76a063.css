@@ -3429,6 +3429,57 @@
 .VibePage_root_reshuffle__gz97v {
     --accent-color: var(--ym-logo-color-primary-player);
 }
+/* for PulseSync: BEGIN keep Wave text and controls readable on the light gradient */
+.Overtone_waveLight {
+    --overtone-wave-ink: #22252d;
+    --overtone-wave-muted: #3b3f49;
+    --overtone-wave-control: rgba(255, 255, 255, 0.62);
+    --overtone-wave-control-hover: rgba(255, 255, 255, 0.88);
+}
+.Overtone_waveLight .VibePage_root__dGvPX {
+    --accent-color: var(--overtone-wave-ink);
+    --ym-controls-color-secondary-text-enabled: var(--overtone-wave-muted);
+    --ym-controls-color-secondary-text-enabled_variant: var(--overtone-wave-ink);
+}
+.Overtone_waveLight .VibePage_vibeAnimation__qQ6ci {
+    filter: opacity(0.12);
+}
+.Overtone_waveLight .VibePlayerBar_progress__Cri6E {
+    color: var(--overtone-wave-ink);
+}
+.Overtone_waveLight .VibePlayerBar_button__GLhJ_,
+.Overtone_waveLight .VibePlayerBar_button__GLhJ_.VibePlayerBar_important__XGV7k,
+.Overtone_waveLight .VibePlayerbarTimecodeContent_center__bHoKj,
+.Overtone_waveLight .VibeContextButton_trigger___2s5g[type='button'],
+.Overtone_waveLight .VibeResetButton_button__i8Cvy {
+    background-color: var(--overtone-wave-control);
+    color: var(--overtone-wave-ink);
+}
+.Overtone_waveLight .VibePlayerBar_button__GLhJ_:is(:hover, :focus-visible),
+.Overtone_waveLight .VibePlayerBar_button__GLhJ_.VibePlayerBar_important__XGV7k:is(:hover, :focus-visible),
+.Overtone_waveLight .VibeContextButton_trigger___2s5g[type='button']:is(:hover, :focus-visible),
+.Overtone_waveLight .VibeResetButton_button__i8Cvy:is(:hover, :focus-visible) {
+    background-color: var(--overtone-wave-control-hover);
+}
+.Overtone_waveLight .VibePage_root__dGvPX :is(button, a, [role='slider']):focus-visible {
+    outline: 2px solid var(--overtone-wave-ink);
+    outline-offset: 2px;
+}
+.Overtone_waveLight .VibePlayerbarTimecodeContent_center__bHoKj::before {
+    background-color: rgba(34, 37, 45, 0.14);
+}
+.Overtone_waveLight .VibeResetButton_context__hsTlv,
+.Overtone_waveLight .AiBadge_icon__dhZpE,
+.Overtone_waveLight .AiBadge_sparkle__5EMmQ,
+.Overtone_waveLight .WordsCardFullscreen_message__UmEx9,
+.Overtone_waveLight .WordsCardFullscreen_primaryAction__HxPI9,
+.Overtone_waveLight .WordsBigCardPanelContent_action__qwVs5 {
+    color: var(--overtone-wave-ink);
+}
+.Overtone_waveLight .VibePage_bigCardPanelBackground__fr_gE::after {
+    background: radial-gradient(ellipse 63.5% 62.7% at 50.3% 47.6%, color-mix(in srgb, currentcolor 22%, #f5f4f1), #f5f4f1);
+}
+/* for PulseSync: END keep Wave text and controls readable on the light gradient */
 @container vibe-page (max-height: 640px) {
     .VibePage_root_withoutPlus__xZ8r4 .VibePage_artistCover__RQee1 {
         display: none;

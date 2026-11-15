@@ -59,6 +59,7 @@ const scrobbleManager_js_1 = require('./lib/scrobble/index.js');
 const { getPulseSyncManager } = require('./lib/pulsesync/PulseSyncManager.js');
 const { isLocalAddonId, localAddons } = require('./lib/pulsesync/localAddons.js');
 const { IsolatedAddonExecutionStore, resolveCanonicalAddon, validateChannelToken } = require('./lib/pulsesync/isolatedAddonExecution.js');
+const { registerAddonNetworkPolicy, readLocalAddonText } = require('./lib/pulsesync/addonNetworkPolicy.js');
 const miniPlayer_js_1 = require('./lib/miniplayer/miniplayer.js');
 const discordRichPresence_js_1 = require('./lib/discordRichPresence.js');
 const { getYandexStationRuntime } = require('./lib/yandexStation/YandexStationRuntime.js');
@@ -1693,10 +1694,9 @@ const registerGlobalApplicationEvents = () => {
             return {
                 executionToken,
                 worldId,
-                securityOrigin: require('./lib/pulsesync/addonNetworkPolicy.js').registerAddonNetworkPolicy(event.sender, worldId, addon, () =>
-                    manager.getWebHostAddonsSnapshot(),
-                ),
+                securityOrigin: registerAddonNetworkPolicy(event.sender, worldId, addon, () => manager.getWebHostAddonsSnapshot()),
                 worldName: `PulseSync addon ${addon.id}`,
+                localNetwork: isLocalAddonId(addon.id),
                 ...(moduleContext ? { moduleCapability: moduleContext.activation.capability } : {}),
             };
         } catch (error) {
@@ -1704,6 +1704,12 @@ const registerGlobalApplicationEvents = () => {
             throw error;
         }
     });
+
+    ipcRegistry.handle(events_js_1.Events.PULSESYNC_ISOLATED_ADDON_READ_TEXT, (event, payload) =>
+        readLocalAddonText(event.sender.id, payload, (options) =>
+            electron_1.net.request({ ...options, session: electron_1.session.fromPartition('overtone-local-addon-net') }),
+        ),
+    );
 
     ipcRegistry.handle(events_js_1.Events.PULSESYNC_ISOLATED_ADDON_EXECUTE, async (event, payload) => {
         if (!mainWindow || event.sender !== mainWindow.webContents || event.senderFrame !== event.sender.mainFrame)

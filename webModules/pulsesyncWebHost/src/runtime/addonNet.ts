@@ -3,11 +3,17 @@ import type { AddonNet, NetRequestOptions } from '../contracts'
 const DEFAULT_TIMEOUT_MS = 15_000
 const MAX_TIMEOUT_MS = 2_147_483_647
 
-export function createAddonNet(lifetime: AbortSignal): AddonNet {
+export type AddonTextNetwork = {
+    readText: (requestId: string, url: string, accept: string) => Promise<{ status: number; statusText: string; text: string } | null>
+    cancel: (requestId: string) => Promise<unknown>
+}
+
+export function createAddonNet(lifetime: AbortSignal, localNetwork?: AddonTextNetwork): AddonNet {
     async function request<T>(
         input: RequestInfo | URL,
         options: NetRequestOptions | undefined,
         read: (response: Response) => Promise<T>,
+        useTextBridge = false,
     ): Promise<T> {
         const { timeoutMs = DEFAULT_TIMEOUT_MS, ...init } = options ?? {}
 
@@ -30,6 +36,41 @@ export function createAddonNet(lifetime: AbortSignal): AddonNet {
                 : undefined
 
         try {
+            // Chromium sends the document's origin for fetches from an isolated world.
+            if (
+                useTextBridge &&
+                localNetwork &&
+                !(input instanceof Request) &&
+                request.method === 'GET' &&
+                request.url.startsWith('https://') &&
+                request.credentials !== 'include' &&
+                Object.keys(init).every(key => ['method', 'credentials', 'headers', 'signal'].includes(key)) &&
+                [...request.headers.keys()].every(name => name === 'accept')
+            ) {
+                const requestId = crypto.randomUUID()
+                const cancel = () => void localNetwork.cancel(requestId).catch(() => {})
+
+                signal.addEventListener('abort', cancel, { once: true })
+
+                try {
+                    const result = await localNetwork.readText(requestId, request.url, request.headers.get('accept') ?? '')
+
+                    signal.throwIfAborted()
+
+                    if (result) {
+                        const { status, statusText, text } = result
+                        const body = [204, 205, 304].includes(status) ? null : text
+
+                        return await read(new Response(body, { status, statusText }))
+                    }
+                } catch (error) {
+                    signal.throwIfAborted()
+                    throw error
+                } finally {
+                    signal.removeEventListener('abort', cancel)
+                }
+            }
+
             const response = await window.fetch(request, { signal })
 
             return await read(response)
@@ -52,16 +93,26 @@ export function createAddonNet(lifetime: AbortSignal): AddonNet {
     return Object.freeze({
         fetch: (input, options) => request(input, options, async response => response),
         json: <T = unknown>(input: RequestInfo | URL, options?: NetRequestOptions) =>
-            request<T>(input, options, response => {
-                requireSuccess(response)
+            request<T>(
+                input,
+                options,
+                response => {
+                    requireSuccess(response)
 
-                return response.json() as Promise<T>
-            }),
+                    return response.json() as Promise<T>
+                },
+                true,
+            ),
         text: (input, options) =>
-            request(input, options, response => {
-                requireSuccess(response)
+            request(
+                input,
+                options,
+                response => {
+                    requireSuccess(response)
 
-                return response.text()
-            }),
+                    return response.text()
+                },
+                true,
+            ),
     } satisfies AddonNet)
 }

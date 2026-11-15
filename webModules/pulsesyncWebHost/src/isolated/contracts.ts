@@ -1,6 +1,7 @@
 import type { Cleanup, PulseSyncAddonFactory, PulseSyncApi, PulseSyncWebHostApi } from '../contracts'
 import type { IsolatedModuleRuntime, ModuleBridge, ModuleInit } from './IsolatedModuleRuntime'
 import type { DiagnosticError } from '../runtime/addonDiagnostics'
+import type { AddonTextNetwork } from '../runtime/addonNet'
 
 export type IsolatedAddonAsset = {
     id: string
@@ -51,5 +52,6 @@ export type IsolatedWindow = Window & {
     __PULSESYNC_ADDON_QUEUE__?: PulseSyncAddonFactory[]
     pulsesyncApi?: PulseSyncApi
     __PULSESYNC_MODULES__?: ModuleBridge
+    __OVERTONE_ADDON_NETWORK__?: AddonTextNetwork
     __PULSESYNC_MODULE_RUNTIME__?: Pick<IsolatedModuleRuntime, 'register' | 'load' | 'instantiateWasm'>
 }

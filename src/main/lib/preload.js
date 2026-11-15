@@ -447,6 +447,7 @@ electron_1.contextBridge.exposeInMainWorld('lyricsfileParser', {
 });
 const waveAnalyserMethods = ['isAvailable', 'getProperties', 'getByteFrequencyData', 'getFloatFrequencyData', 'getByteTimeDomainData', 'getFloatTimeDomainData'];
 const waveAnalyserWorlds = new Set();
+const localAddonNetworkWorlds = new Set();
 let waveAnalyserProvider = null;
 const waveAnalyserBridge = Object.fromEntries(
     waveAnalyserMethods.map((method) => [
@@ -478,6 +479,14 @@ electron_1.contextBridge.exposeInMainWorld('pulseSyncWebHost', {
         }
 
         electron_1.webFrame.setIsolatedWorldInfo(worldId, { securityOrigin, name: worldName });
+        if (prepared.localNetwork === true && !localAddonNetworkWorlds.has(worldId)) {
+            const invoke = (payload) => electron_1.ipcRenderer.invoke(events_js_1.Events.PULSESYNC_ISOLATED_ADDON_READ_TEXT, { ...payload, worldId });
+            electron_1.contextBridge.exposeInIsolatedWorld(worldId, '__OVERTONE_ADDON_NETWORK__', {
+                readText: (requestId, url, accept) => invoke({ requestId, url, accept }),
+                cancel: (requestId) => invoke({ requestId, cancel: true }),
+            });
+            localAddonNetworkWorlds.add(worldId);
+        }
         if (prepared.moduleCapability) {
             electron_1.contextBridge.exposeInIsolatedWorld(
                 worldId,

@@ -9,7 +9,7 @@ import { copyResourceData } from '../../../pulsesyncRuntime/src/features/resourc
 import type { PulseSyncAddonApi, PulseSyncApi, PulseSyncWebHostClient } from '../contracts'
 import type { PulseSyncPlayerSnapshot, PulseSyncQueueSnapshot, PulseSyncRouteSnapshot } from '@pulsesync/yamusic-types'
 import { createAddonAssets, createAddonIdentity, createAddonNamespaces } from '../runtime/addonResources'
-import { createAddonNet } from '../runtime/addonNet'
+import { createAddonNet, type AddonTextNetwork } from '../runtime/addonNet'
 import { createAddonLifecycle } from '../runtime/addonLifecycle'
 import { createAddonStorage } from '../runtime/addonStorage'
 import {
@@ -198,7 +198,7 @@ export class IsolatedBridge {
     private started = false
     private disposed = false
 
-    constructor(init: IsolatedInit) {
+    constructor(init: IsolatedInit, localNetwork?: AddonTextNetwork) {
         this.init = init
         this.diagnostics = new AddonDiagnostics(init.addon.id, event => this.queueDiagnostic(event))
         this.clientMethods = new Set(init.clientMethods)
@@ -309,7 +309,7 @@ export class IsolatedBridge {
             ...this.diagnostics.instrument(createAddonLifecycle(this.lifetime.signal), 'lifecycle', 'lifecycle'),
             settings: settingsStore,
             assets: this.diagnostics.instrument(createAddonAssets(init.addon.id, this.lifetime.signal), 'assets'),
-            net: this.diagnostics.instrument(createAddonNet(this.lifetime.signal), 'net'),
+            net: this.diagnostics.instrument(createAddonNet(this.lifetime.signal, localNetwork), 'net'),
             storage: createAddonStorage((method, args) => this.callRequest(method, args, 'storage')),
             logger: Object.freeze({
                 info: (...args: unknown[]) => this.log('info', args),

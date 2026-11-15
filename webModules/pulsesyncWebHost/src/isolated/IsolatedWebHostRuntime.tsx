@@ -43,7 +43,7 @@ export class IsolatedWebHostRuntime {
     constructor(isolatedWindow: IsolatedWindow, init: IsolatedInit) {
         this.isolatedWindow = isolatedWindow
         this.init = init
-        this.bridge = new IsolatedBridge(init)
+        this.bridge = new IsolatedBridge(init, isolatedWindow.__OVERTONE_ADDON_NETWORK__)
         this.targets = new IsolatedTargetRegistry(
             () => this.renderDefinition(),
             (level, args) => this.bridge.log(level, args),
@@ -261,7 +261,7 @@ export class IsolatedWebHostRuntime {
             ...this.bridge.diagnostics.instrument(createAddonLifecycle(signal), 'lifecycle', 'lifecycle'),
             ...createAddonNamespaces(this.bridge.pulsesyncApi, undefined, signal, this.bridge.diagnostics),
             assets: this.bridge.diagnostics.instrument(createAddonAssets(addonId, signal), 'assets'),
-            net: this.bridge.diagnostics.instrument(createAddonNet(signal), 'net'),
+            net: this.bridge.diagnostics.instrument(createAddonNet(signal, this.isolatedWindow.__OVERTONE_ADDON_NETWORK__), 'net'),
         })
 
         this.activationApi = api

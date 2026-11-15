@@ -6151,14 +6151,16 @@
                             ev || ef(!1);
                         }, [ef, ev]));
                     // for PulseSync: BEGIN use the cover color in the animated and static wave backgrounds
-                    const waveAppearance = waveCoverPalette
-                        ? {
-                              ...en,
-                              color: waveCover.getWaveCoverShade(waveCoverPalette.primary),
-                              coverGradient: `linear-gradient(155deg, ${[waveCoverPalette.accent, waveCoverPalette.secondary, waveCoverPalette.primary].map(waveCover.getWaveCoverShade).join(', ')})`,
-                              blendMode: undefined,
-                          }
-                        : en;
+                    const waveAppearance = (0, p.useMemo)(() => {
+                        if (!waveCoverPalette) return en;
+                        const { top, middle, bottom } = waveCover.getWaveCoverGlow(waveCoverPalette);
+                        return {
+                            ...en,
+                            color: waveCover.waveCoverHsl(middle),
+                            coverGradient: `linear-gradient(155deg, ${[top, middle, bottom].map(waveCover.waveCoverHsl).join(', ')})`,
+                            blendMode: undefined,
+                        };
+                    }, [en, waveCoverPalette]);
                     let ew = (0, k.L)(() =>
                             I.checkExperiment(G.z.WebNextShaderFallbackEnabled, 'on')
                                 ? (0, u.jsx)(D, { className: n4().vibeAnimation, appearance: waveAppearance })

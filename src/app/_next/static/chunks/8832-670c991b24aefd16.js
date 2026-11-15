@@ -170,12 +170,18 @@
                 getWaveCoverUri: () => getWaveCoverUri,
                 getWaveCoverGradient: () => getWaveCoverGradient,
                 getWaveCoverShade: () => getWaveCoverShade,
+                getWaveCoverGlow: () => getWaveCoverGlow,
+                waveCoverHsl: () => waveCoverHsl,
             });
             const react = require(53548);
             const coverImages = require(35412);
             const settingKey = 'modSettings.vibeAnimationEnhancement.useTrackCoverColors';
             const coverCache = new Map();
             const sampleSize = 24;
+            const hueStep = 15;
+            const hueBucketCount = 360 / hueStep;
+            // These stops follow the layout gradient from the Wave panel toward the navigation.
+            const darkGradientTints = [100, 91, 78, 67, 56, 48, 42, 36, 32, 28, 23, 18, 12, 6, 0, 0];
             const neutral = { h: 0, s: 0, l: 24 };
             const neutralPalette = { primary: neutral, accent: neutral, secondary: neutral, backgroundLightness: 24, pending: true };
             const getEnabled = () => window.nativeSettings?.get?.(settingKey) === true;
@@ -188,9 +194,8 @@
             const getWaveCoverUri = (track, isGenerative) => (isGenerative ? track?.coverUri : track?.mainAlbum?.coverUri || track?.coverUri);
 
             function sampleCover(pixels) {
-                const buckets = new Map();
+                const buckets = Array.from({ length: hueBucketCount }, () => ({ count: 0, weight: 0, r: 0, g: 0, b: 0 }));
                 let opaquePixels = 0;
-                let chromaticPixels = 0;
                 let lumaSum = 0;
                 let lightPixels = 0;
                 let lightLumaSum = 0;
@@ -208,40 +213,48 @@
                     }
                     const max = Math.max(r, g, b);
                     const chroma = max - Math.min(r, g, b);
-                    if (chroma < 30 || max < 52) continue;
+                    if (chroma < 22 || max < 44) continue;
 
-                    chromaticPixels++;
-                    const hue = 60 * (max === r ? (g - b) / chroma : max === g ? (b - r) / chroma + 2 : (r - g) / chroma + 4);
-                    const key = Math.round((hue + 360) / 30) % 12;
-                    const bucket = buckets.get(key) ?? { count: 0, weight: 0, r: 0, g: 0, b: 0 };
-                    bucket.count++;
-                    const weight = 1 + chroma / 255;
-                    bucket.weight += weight;
-                    bucket.r += r * weight;
-                    bucket.g += g * weight;
-                    bucket.b += b * weight;
-                    buckets.set(key, bucket);
+                    const hue = (60 * (max === r ? (g - b) / chroma : max === g ? (b - r) / chroma + 2 : (r - g) / chroma + 4) + 360) % 360;
+                    const center = Math.floor(hue / hueStep);
+                    // Prefer visible color over near-gray pixels, and let neighboring hues vote together.
+                    const chromaWeight = ((chroma - 17) / 60) ** 1.55 * (chroma / max) ** 0.7;
+                    const weight = chromaWeight * (0.18 + (luma / 100) ** 2);
+                    for (let index = center - 1; index <= center + 2; index++) {
+                        const spread = 1 - Math.abs(hue - index * hueStep) / 26;
+                        if (spread <= 0) continue;
+                        const bucket = buckets[(index + hueBucketCount) % hueBucketCount];
+                        const contribution = weight * spread;
+                        if (chroma >= 32) bucket.count++;
+                        bucket.weight += contribution;
+                        bucket.r += r * contribution;
+                        bucket.g += g * contribution;
+                        bucket.b += b * contribution;
+                    }
                 }
                 if (!opaquePixels) return null;
                 const backgroundLightness = (100 * lumaSum) / (255 * opaquePixels);
                 const gray = { h: 0, s: 0, l: backgroundLightness };
-                if (chromaticPixels < Math.max(6, opaquePixels * 0.08)) {
+                const minColorPixels = Math.max(6, Math.ceil(opaquePixels * 0.012));
+                const minColorWeight = opaquePixels * 0.0017;
+                const colors = buckets
+                    .filter(({ count, weight }) => count >= minColorPixels && weight >= minColorWeight)
+                    .sort((left, right) => right.weight - left.weight);
+                if (!colors.length) {
                     const highlight = lightPixels ? { h: 0, s: 0, l: (100 * lightLumaSum) / (255 * lightPixels) } : gray;
-                    return { primary: gray, accent: highlight, secondary: gray, backgroundLightness };
+                    return { primary: gray, secondary: highlight, accent: gray, backgroundLightness };
                 }
 
-                const colors = [...buckets.values()]
-                    .filter(({ count }) => count >= Math.max(3, opaquePixels * 0.025))
-                    .sort((left, right) => right.weight - left.weight);
                 const selected = [];
                 for (const { weight, r, g, b } of colors) {
+                    if (weight < colors[0].weight * 0.3) break;
                     const hex = '#' + [r, g, b].map((channel) => Math.round(channel / weight).toString(16).padStart(2, '0')).join('');
                     const color = coverImages.g8(hex);
-                    if (selected.some(({ h }) => Math.abs(((color.h - h + 540) % 360) - 180) < 48)) continue;
+                    if (selected.some(({ h }) => Math.abs(((color.h - h + 540) % 360) - 180) < 40)) continue;
                     selected.push(color);
                     if (selected.length === 3) break;
                 }
-                const [primary = gray, accent = primary, secondary = primary] = selected;
+                const [primary, secondary = primary, accent = primary] = selected;
                 return { primary, accent, secondary, backgroundLightness };
             }
 
@@ -303,8 +316,21 @@
                 return (url && (coverCache.get(url)?.palette ?? (sample?.url === url ? sample.palette : null))) || neutralPalette;
             }
 
-            function getWaveCoverShade({ h, s, l }) {
-                return `hsl(${h} ${s * 0.58}% ${8 + l * 0.23}%)`;
+            const waveCoverHsl = ({ h, s, l }) => `hsl(${h} ${s}% ${l}%)`;
+            const getCoverSaturation = (s) => (s > 0 ? Math.min(90, 48 + s * 0.55) : 0);
+            const getWaveCoverShade = ({ h, s, l }) => waveCoverHsl({ h, s: getCoverSaturation(s), l: 8 + l * 0.18 });
+
+            function getWaveCoverGlow(palette) {
+                const glow = ({ h, s, l }, offset) => ({
+                    h,
+                    s: getCoverSaturation(s),
+                    l: s ? Math.min(54, 25 + l * 0.3 + offset) : Math.min(60, 21 + l * 0.31 + offset),
+                });
+                return {
+                    top: glow(palette.secondary, 8),
+                    middle: glow(palette.primary, 4),
+                    bottom: glow(palette.accent, 0),
+                };
             }
 
             function getWaveCoverGradient(palette, isPlaying, fallbackStops, isLight) {
@@ -316,17 +342,25 @@
                         return `color-mix(in srgb, #f5f4f1, ${color} ${tint}%)`;
                     });
                 }
-                const surface = isLight ? '#f5f4f1' : '#101010';
-                const shades = [palette.primary, palette.accent, palette.secondary].map(({ h, s, l }) =>
-                    `hsl(${h} ${Math.min(72, s * 0.76)}% ${isLight ? Math.min(68, l) : 9 + 0.14 * palette.backgroundLightness + 0.14 * l}%)`,
+                const { h, s, l } = palette.primary;
+                if (!isLight) {
+                    const brightness = s ? Math.min(32, 18 + l * 0.19 + s * 0.12) : 4 + palette.backgroundLightness * 0.14;
+                    const shade = waveCoverHsl({ h, s: getCoverSaturation(s), l: brightness });
+                    return darkGradientTints.map((strength) => {
+                        const tint = Math.round(strength * (isPlaying ? 1 : 0.7));
+                        return tint ? `color-mix(in srgb, #000, ${shade} ${tint}%)` : '#000';
+                    });
+                }
+                const shades = [palette.primary, palette.secondary, palette.accent].map(({ h, s, l }) =>
+                    waveCoverHsl({ h, s: Math.min(72, s * 0.76), l: Math.min(68, l) }),
                 );
                 return Array.from({ length: 16 }, (_, index) => {
                     const position = index / 15;
                     const zone = Math.min(1, Math.floor(position * 3));
                     const blend = Math.round(Math.min(1, position * 3 - zone) * 100);
                     const shade = `color-mix(in srgb, ${shades[zone]}, ${shades[zone + 1]} ${blend}%)`;
-                    const tint = Math.round((isLight ? (isPlaying ? 23 : 13) : isPlaying ? 100 : 65) * (1 - position ** 2));
-                    return `color-mix(in srgb, ${surface}, ${shade} ${tint}%)`;
+                    const tint = Math.round((isPlaying ? 23 : 13) * (1 - position ** 2));
+                    return `color-mix(in srgb, #f5f4f1, ${shade} ${tint}%)`;
                 });
             }
 

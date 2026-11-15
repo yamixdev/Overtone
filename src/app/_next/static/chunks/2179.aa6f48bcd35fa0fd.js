@@ -47,10 +47,12 @@
             };
             // for PulseSync: END derive wave hue from track artwork
             // for PulseSync: BEGIN adapt the shared artwork palette to the Wave shader
+            const waveCover = t(913004);
             const resolvePulseSyncCoverPalette = (palette) => {
                 if (!palette) return undefined;
-                const shade = ({ h, s, l }, offset) => E(h, Math.min(78, s * 0.86), Math.min(52, 14 + l * 0.29 + offset));
-                return { top: shade(palette.accent, 10), middle: shade(palette.secondary, 4), bottom: shade(palette.primary, 0) };
+                const { top, middle, bottom } = waveCover.getWaveCoverGlow(palette);
+                const shade = ({ h, s, l }) => E(h, s, l);
+                return { top: shade(top), middle: shade(middle), bottom: shade(bottom) };
             };
             // for PulseSync: END adapt the shared artwork palette to the Wave shader
             let w = { transparent: !0 },

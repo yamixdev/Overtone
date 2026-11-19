@@ -1,4 +1,4 @@
-import { useState, type ComponentProps, type ReactNode } from 'react';
+import { Fragment, useState, type ComponentProps, type ReactNode } from 'react';
 import { SettingAction } from '../controls/SettingAction';
 import { SettingInput } from '../controls/SettingInput';
 import { SettingPath } from '../controls/SettingPath';
@@ -20,8 +20,13 @@ export type SettingsSchemaItem =
       }
     | {
           id: string;
+          type: 'custom';
+          element: ReactNode;
+      }
+    | {
+          id: string;
           type: 'action';
-          props: ComponentProps<typeof SettingAction>;
+          props: ComponentProps<typeof SettingAction> & { description?: string };
       }
     | {
           id: string;
@@ -77,6 +82,8 @@ function renderItem(item: SettingsSchemaItem) {
             );
         }
 
+        case 'custom':
+            return <Fragment key={item.id}>{item.element}</Fragment>;
         case 'action':
             return (
                 <SettingsItem id={item.id} key={item.id} searchText={[item.props.title, item.props.description]}>

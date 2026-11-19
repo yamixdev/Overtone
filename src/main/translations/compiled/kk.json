@@ -35,10 +35,22 @@
             "value": "Ойнату жарнамадан кейін бірден басталады"
         }
     ],
+    "ads.disable-ads": [
+        {
+            "type": 0,
+            "value": "Жарнаманы өшіру"
+        }
+    ],
     "ads.learn-more": [
         {
             "type": 0,
             "value": "Толығырақ білу"
+        }
+    ],
+    "ads.notification": [
+        {
+            "type": 0,
+            "value": "Плюс мультижазылымымен жарнамасыз тыңдаңыз"
         }
     ],
     "advert.banner": [
@@ -493,6 +505,24 @@
         {
             "type": 0,
             "value": "Жаңа плейлист"
+        }
+    ],
+    "collection.vibes-all": [
+        {
+            "type": 0,
+            "value": "Все"
+        }
+    ],
+    "collection.vibes-liked": [
+        {
+            "type": 0,
+            "value": "Вам понравилось"
+        }
+    ],
+    "collection.vibes-rooms": [
+        {
+            "type": 0,
+            "value": "На двоих"
         }
     ],
     "collection.your-created-playlists": [
@@ -2602,10 +2632,10 @@
             "value": "Әртістер парақшаларындағы болашақ релиздерге лайк қойыңыз, сонда олар осында пайда болады"
         }
     ],
-    "error-messages.empty-collection-waves-title": [
+    "error-messages.empty-collection-vibes-title": [
         {
             "type": 0,
-            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+            "value": "Ставьте лайки, и здесь появятся волны"
         }
     ],
     "error-messages.empty-shelf-liked-page-link": [
@@ -2988,6 +3018,12 @@
         {
             "type": 0,
             "value": "Жабу"
+        }
+    ],
+    "interface-actions.close-ad": [
+        {
+            "type": 0,
+            "value": "Жарнаманы жабу"
         }
     ],
     "interface-actions.close-my-vibe-settings": [
@@ -3630,6 +3666,12 @@
         {
             "type": 0,
             "value": "» топтамасы плейлистерінің тізімі"
+        }
+    ],
+    "multivibe.nda": [
+        {
+            "type": 0,
+            "value": "NDA"
         }
     ],
     "music-history.album": [
@@ -10204,7 +10246,7 @@
     "vibe-actions.vibe-context": [
         {
             "options": {
-                "MIX": {
+                "mix": {
                     "value": [
                         {
                             "type": 0,
@@ -11871,7 +11913,7 @@
     "interface-actions.add-to-collection": [
         {
             "type": 0,
-            "value": "Добавить в Коллекцию"
+            "value": "Топтамаға қосу"
         }
     ],
     "notifications-info.my-vibe-added-to-collection": [
@@ -11923,7 +11965,7 @@
     "shared-vibe.modal-description": [
         {
             "type": 0,
-            "value": "Слушайте Мою волну и сохраняйте её в Коллекцию"
+            "value": "Менің толқынымды тыңдаңыз және оны Коллекцияға сақтап қойыңыз"
         }
     ],
     "notifications-info.my-vibe-removed-from-collection": [

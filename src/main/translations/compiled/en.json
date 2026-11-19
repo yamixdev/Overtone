@@ -35,10 +35,22 @@
             "value": "Playback will begin right after the ad."
         }
     ],
+    "ads.disable-ads": [
+        {
+            "type": 0,
+            "value": "Turn off ads"
+        }
+    ],
     "ads.learn-more": [
         {
             "type": 0,
             "value": "Learn more"
+        }
+    ],
+    "ads.notification": [
+        {
+            "type": 0,
+            "value": "Listen ad-free with a Yandex Plus multi-subscription"
         }
     ],
     "advert.banner": [
@@ -473,6 +485,24 @@
         {
             "type": 0,
             "value": "New playlist"
+        }
+    ],
+    "collection.vibes-all": [
+        {
+            "type": 0,
+            "value": "Все"
+        }
+    ],
+    "collection.vibes-liked": [
+        {
+            "type": 0,
+            "value": "Вам понравилось"
+        }
+    ],
+    "collection.vibes-rooms": [
+        {
+            "type": 0,
+            "value": "На двоих"
         }
     ],
     "collection.your-created-playlists": [
@@ -2730,10 +2760,10 @@
             "value": "Like the upcoming releases on the artists' pages, and they'll appear here"
         }
     ],
-    "error-messages.empty-collection-waves-title": [
+    "error-messages.empty-collection-vibes-title": [
         {
             "type": 0,
-            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+            "value": "Ставьте лайки, и здесь появятся волны"
         }
     ],
     "error-messages.empty-shelf-liked-page-link": [
@@ -3108,6 +3138,12 @@
         {
             "type": 0,
             "value": "Close"
+        }
+    ],
+    "interface-actions.close-ad": [
+        {
+            "type": 0,
+            "value": "Close ad"
         }
     ],
     "interface-actions.close-my-vibe-settings": [
@@ -3762,6 +3798,12 @@
         {
             "type": 0,
             "value": "\" selection"
+        }
+    ],
+    "multivibe.nda": [
+        {
+            "type": 0,
+            "value": "NDA"
         }
     ],
     "music-history.album": [
@@ -10678,7 +10720,7 @@
     "vibe-actions.vibe-context": [
         {
             "options": {
-                "MIX": {
+                "mix": {
                     "value": [
                         {
                             "type": 0,
@@ -12373,7 +12415,7 @@
     "interface-actions.add-to-collection": [
         {
             "type": 0,
-            "value": "Добавить в Коллекцию"
+            "value": "Add to Collection"
         }
     ],
     "notifications-info.my-vibe-added-to-collection": [
@@ -12421,7 +12463,7 @@
     "shared-vibe.modal-description": [
         {
             "type": 0,
-            "value": "Слушайте Мою волну и сохраняйте её в Коллекцию"
+            "value": "Listen to My Vibe and save it to My Collection"
         }
     ],
     "notifications-info.my-vibe-removed-from-collection": [

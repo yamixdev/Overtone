@@ -18,6 +18,9 @@ import type {
     FormValues,
     PulseSyncTrackMeta,
     PulseSyncWebHostApiV1,
+    NativeLyricsApi,
+    FullscreenPlayerApi,
+    LocalTracksApi,
 } from '@pulsesync/yamusic-types'
 
 import type { PulseSyncResourceReadTarget } from '../../pulsesyncRuntime/src/features/resourceReads'
@@ -227,7 +230,7 @@ export type PulseSyncAddonMountTarget =
     | Element
     | string
     | (() => Element | null)
-    | { selector: string }
+    | { selector: string; all?: boolean }
     | { slot: string }
 
 export type PulseSyncAddonMount = {
@@ -268,6 +271,9 @@ export type PulseSyncAddonApi = {
     readonly client: PulseSyncWebHostClient
     readonly pulsesyncApi: PulseSyncWebHostClient
     readonly player: PulseSyncPlayerApiV1
+    readonly nativeLyrics: NativeLyricsApi
+    readonly fullscreenPlayer: FullscreenPlayerApi
+    readonly localTracks: LocalTracksApi
     readonly downloads: DownloadsApi
     readonly page: PulseSyncPageApiV1
     readonly router: PulseSyncRouterApiV1

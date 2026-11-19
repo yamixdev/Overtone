@@ -153,6 +153,7 @@
                             window.dispatchEvent(
                                 new CustomEvent('vibe:energy', {
                                     detail: {
+                                        source: 'yandex-native',
                                         energy: energyNormalized,
                                         rms: rms,
                                         bands: {

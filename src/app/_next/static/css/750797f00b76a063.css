@@ -4272,4 +4272,21 @@
         justify-content: flex-end;
     }
 }
+@media only screen and (min-width: 768px) and (max-width: 1000px) {
+    .VibePlayerBar_progress__Cri6E.PulseSync_waveProgress_improved {
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        max-height: none;
+    }
+    .VibePlayerBar_progress__Cri6E.PulseSync_waveProgress_improved > .VibePlayerbarTimecodeContent_root__arFLi {
+        grid-column: 1 / -1;
+        grid-row: 1;
+        height: 4rem;
+    }
+    .PulseSync_waveProgress_improved > .PulseSync_waveSideControls_left {
+        grid-area: 2 / 1;
+    }
+    .PulseSync_waveProgress_improved > .PulseSync_waveSideControls_right {
+        grid-area: 2 / 2;
+    }
+}
 /* for PulseSync: END Yandex Station cast popover and centered wave progress control layout */

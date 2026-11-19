@@ -182,6 +182,10 @@ const normalizeSubstitutedTrack = (track) => {
         track.coverUri;
 };
 
+const CUSTOM_SHADER_SOURCE_KEY = 'modSettings.vibeAnimationEnhancement.customShaderSource';
+const VIBE_ANIMATION_VARIANT_KEY = 'modSettings.vibeAnimationEnhancement.animationVariant';
+const VIBE_PREVIOUS_ANIMATION_VARIANT_KEY = 'modSettings.vibeAnimationEnhancement.previousAnimationVariant';
+
 const updateGlobalShortcuts = () => {
     eventsLogger.info('(GlobalShortcuts) Update triggered.');
     electron_1.globalShortcut.unregisterAll();
@@ -1168,6 +1172,17 @@ const handleApplicationEvents = (window) => {
 
     const setNativeStoreValue = (key, value) => {
         if (key === windowZoom.INTERFACE_SCALE_KEY) return windowZoom.setPreferredScale(window, value);
+        if (key === VIBE_ANIMATION_VARIANT_KEY && value === 'custom') {
+            const currentVariant = store_js_1.get(key);
+            if (currentVariant !== 'custom') {
+                store_js_1.set(VIBE_PREVIOUS_ANIMATION_VARIANT_KEY, currentVariant ?? null);
+            }
+        }
+        if (key === CUSTOM_SHADER_SOURCE_KEY && value === '' && store_js_1.get(VIBE_ANIMATION_VARIANT_KEY) === 'custom') {
+            const previous = store_js_1.get(VIBE_PREVIOUS_ANIMATION_VARIANT_KEY);
+            const fallback = previous === 'vibe' || previous === 'ncs' || previous === null ? previous : 'auto';
+            setNativeStoreValue(VIBE_ANIMATION_VARIANT_KEY, fallback);
+        }
         store_js_1.set(key, value);
         if (key === windowZoom.FIT_INTERFACE_TO_WINDOW_KEY) windowZoom.applyWindowZoom(window);
         if (key === 'modSettings.r128Normalization' && value !== true) ugcLoudness.cancelPending();
@@ -1203,10 +1218,14 @@ const handleApplicationEvents = (window) => {
         return store_js_1.get(key);
     });
     ipcRegistry.handle(events_js_1.Events.NATIVE_STORE_SET, (event, key, value) => {
-        eventsLogger.info(`Event received`, events_js_1.Events.NATIVE_STORE_SET, key, value);
+        if (key === CUSTOM_SHADER_SOURCE_KEY && (typeof value !== 'string' || Buffer.byteLength(value, 'utf8') > 64 * 1024)) {
+            throw new Error('Некорректный исходный код пользовательского шейдера');
+        }
+        eventsLogger.info(`Event received`, events_js_1.Events.NATIVE_STORE_SET, key, key === CUSTOM_SHADER_SOURCE_KEY ? undefined : value);
         return setNativeStoreValue(key, value);
     });
     ipcRegistry.on(events_js_1.Events.NATIVE_STORE_SET, (event, key, value) => {
+        if (key === CUSTOM_SHADER_SOURCE_KEY) return;
         eventsLogger.info(`Event received`, events_js_1.Events.NATIVE_STORE_SET, key, value);
         setNativeStoreValue(key, value);
     });
@@ -1495,7 +1514,7 @@ const sendNativeStoreUpdate = (key, value, window = undefined) => {
     const win = window ?? mainWindow;
     if (win && win.webContents && typeof win.webContents.send === 'function') {
         sendToApplicationRenderer(win, events_js_1.Events.NATIVE_STORE_UPDATE, key, value);
-        eventsLogger.info('Event sent', events_js_1.Events.NATIVE_STORE_UPDATE, key, value);
+        eventsLogger.info('Event sent', events_js_1.Events.NATIVE_STORE_UPDATE, key, key === CUSTOM_SHADER_SOURCE_KEY ? undefined : value);
         if (key === 'modSettings' || (typeof key === 'string' && key.startsWith('modSettings.'))) {
             MiniPlayer.updateSettingsState(store_js_1.getModSettings());
         }
@@ -1503,7 +1522,12 @@ const sendNativeStoreUpdate = (key, value, window = undefined) => {
             discordRichPresence_js_1.refreshSettings();
         }
     } else {
-        eventsLogger.warn('Event not sent, window is undefined or does not support webContents.send', events_js_1.Events.NATIVE_STORE_UPDATE, key, value);
+        eventsLogger.warn(
+            'Event not sent, window is undefined or does not support webContents.send',
+            events_js_1.Events.NATIVE_STORE_UPDATE,
+            key,
+            key === CUSTOM_SHADER_SOURCE_KEY ? undefined : value,
+        );
     }
 };
 exports.sendNativeStoreUpdate = sendNativeStoreUpdate;

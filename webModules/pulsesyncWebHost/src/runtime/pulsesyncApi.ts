@@ -37,6 +37,12 @@ export function createAddonApi(
         'abort',
         () => {
             const api = getPulseSyncApi()
+            const clearLyrics = api?.clearNativeLyricsTimings
+
+            if (typeof clearLyrics === 'function') {
+                Reflect.apply(clearLyrics, api, [identity.id])
+            }
+
             const clearDownloads = api?.clearTrackDownloads
 
             if (typeof clearDownloads === 'function') {

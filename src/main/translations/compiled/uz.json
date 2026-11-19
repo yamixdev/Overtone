@@ -35,10 +35,22 @@
             "value": "Ijro reklamadan keyin boshlanadi"
         }
     ],
+    "ads.disable-ads": [
+        {
+            "type": 0,
+            "value": "Reklamani faolsizlantirish"
+        }
+    ],
     "ads.learn-more": [
         {
             "type": 0,
             "value": "Batafsil bilib olish"
+        }
+    ],
+    "ads.notification": [
+        {
+            "type": 0,
+            "value": "Plus multi-obunasi bilan reklamasiz tinglang"
         }
     ],
     "advert.banner": [
@@ -469,6 +481,24 @@
         {
             "type": 0,
             "value": "Yangi pleylist"
+        }
+    ],
+    "collection.vibes-all": [
+        {
+            "type": 0,
+            "value": "Все"
+        }
+    ],
+    "collection.vibes-liked": [
+        {
+            "type": 0,
+            "value": "Вам понравилось"
+        }
+    ],
+    "collection.vibes-rooms": [
+        {
+            "type": 0,
+            "value": "На двоих"
         }
     ],
     "collection.your-created-playlists": [
@@ -2634,10 +2664,10 @@
             "value": "Ijrochilarning sahifalari kelgusi relizlariga layklar bosing va ular bu yerda koʻrinadi"
         }
     ],
-    "error-messages.empty-collection-waves-title": [
+    "error-messages.empty-collection-vibes-title": [
         {
             "type": 0,
-            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+            "value": "Ставьте лайки, и здесь появятся волны"
         }
     ],
     "error-messages.empty-shelf-liked-page-link": [
@@ -3012,6 +3042,12 @@
         {
             "type": 0,
             "value": "Yopish"
+        }
+    ],
+    "interface-actions.close-ad": [
+        {
+            "type": 0,
+            "value": "Reklamani yopish"
         }
     ],
     "interface-actions.close-my-vibe-settings": [
@@ -3662,6 +3698,12 @@
         {
             "type": 0,
             "value": "” termasi pleylistlari roʻyxati"
+        }
+    ],
+    "multivibe.nda": [
+        {
+            "type": 0,
+            "value": "NDA"
         }
     ],
     "music-history.album": [
@@ -9978,7 +10020,7 @@
     "vibe-actions.vibe-context": [
         {
             "options": {
-                "MIX": {
+                "mix": {
                     "value": [
                         {
                             "type": 0,
@@ -11597,7 +11639,7 @@
     "interface-actions.add-to-collection": [
         {
             "type": 0,
-            "value": "Добавить в Коллекцию"
+            "value": "Termaga kiritish"
         }
     ],
     "notifications-info.my-vibe-added-to-collection": [
@@ -11649,7 +11691,7 @@
     "shared-vibe.modal-description": [
         {
             "type": 0,
-            "value": "Слушайте Мою волну и сохраняйте её в Коллекцию"
+            "value": "Mening toʻlqinimni tinglang va uni Termaga saqlang"
         }
     ],
     "notifications-info.my-vibe-removed-from-collection": [

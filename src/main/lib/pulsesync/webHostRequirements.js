@@ -7,11 +7,15 @@ const WEB_HOST_CAPABILITIES = Object.freeze([
     'net-per-addon-v1',
     'scoped-css-v1',
     'native-ui-v2',
+    'mount-targets-all-v1',
     'modules-v1',
     'metadata-overrides-v1',
     'library-overrides-v1',
     'resource-hooks-v1',
     'resource-read-v1',
+    'native-lyrics-v1',
+    'fullscreen-player-v1',
+    'local-tracks-v1',
 ]);
 
 function normalizeWebHostRequirements(requirements) {

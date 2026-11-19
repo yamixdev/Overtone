@@ -35,10 +35,22 @@
             "value": "Воспроизведение начнется сразу после рекламы"
         }
     ],
+    "ads.disable-ads": [
+        {
+            "type": 0,
+            "value": "Отключить рекламу"
+        }
+    ],
     "ads.learn-more": [
         {
             "type": 0,
             "value": "Узнать подробнее"
+        }
+    ],
+    "ads.notification": [
+        {
+            "type": 0,
+            "value": "Слушайте без рекламы с мультиподпиской Плюс"
         }
     ],
     "advert.banner": [
@@ -489,6 +501,24 @@
         {
             "type": 0,
             "value": "Новый плейлист"
+        }
+    ],
+    "collection.vibes-all": [
+        {
+            "type": 0,
+            "value": "Все"
+        }
+    ],
+    "collection.vibes-liked": [
+        {
+            "type": 0,
+            "value": "Вам понравилось"
+        }
+    ],
+    "collection.vibes-rooms": [
+        {
+            "type": 0,
+            "value": "На двоих"
         }
     ],
     "collection.your-created-playlists": [
@@ -2794,10 +2824,10 @@
             "value": "Ставьте лайки будущим релизам на страницах артистов, и они появятся тут"
         }
     ],
-    "error-messages.empty-collection-waves-title": [
+    "error-messages.empty-collection-vibes-title": [
         {
             "type": 0,
-            "value": "Ставьте лайки Моим волнам, и они появятся тут"
+            "value": "Ставьте лайки, и здесь появятся волны"
         }
     ],
     "error-messages.empty-shelf-liked-page-link": [
@@ -3180,6 +3210,12 @@
         {
             "type": 0,
             "value": "Закрыть"
+        }
+    ],
+    "interface-actions.close-ad": [
+        {
+            "type": 0,
+            "value": "Закрыть рекламу"
         }
     ],
     "interface-actions.close-my-vibe-settings": [
@@ -3838,6 +3874,12 @@
         {
             "type": 0,
             "value": "»"
+        }
+    ],
+    "multivibe.nda": [
+        {
+            "type": 0,
+            "value": "NDA"
         }
     ],
     "music-history.album": [
@@ -10854,7 +10896,7 @@
     "vibe-actions.vibe-context": [
         {
             "options": {
-                "MIX": {
+                "mix": {
                     "value": [
                         {
                             "type": 0,

@@ -23,7 +23,9 @@
                         'data-test-id': r.Kq.vibeAnimation.VIBE_ANIMATION,
                         children: (0, t.jsx)('div', {
                             className: (0, _.$)(c().fallback, { [c().fallback_colored]: i.color }),
-                            style: i.color ? { backgroundColor: i.color, maskImage: b } : void 0,
+                            // for PulseSync: BEGIN tint the fallback animation with the same cover palette
+                            style: i.color ? { backgroundColor: i.color, backgroundImage: i.coverGradient, maskImage: b } : void 0,
+                            // for PulseSync: END tint the fallback animation with the same cover palette
                             'aria-hidden': !0,
                             children: (0, t.jsx)(l._V, {
                                 src: 'reshuffle' === i.image ? 'avatars.mds.yandex.net/get-music-misc/34161/img.69f094ae5e8c2b29ab5e5346/%%' : m,

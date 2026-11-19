@@ -1,6 +1,12 @@
 (self.webpackChunk_N_E = self.webpackChunk_N_E || []).push([
     [7956],
     {
+        // for PulseSync WebHost: BEGIN native addon lazy disclaimer export
+        9958926: (e, t, i) => {
+            'use strict';
+            i.d(t, { N: () => i(90224).N });
+        },
+        // for PulseSync WebHost: END native addon lazy disclaimer export
         6900: (e, L, t) => {
             'use strict';
             t.d(L, { J: () => a, o: () => l });
@@ -67,7 +73,7 @@
             // for PulseSync WebHost: BEGIN native addon controls, tabs, tooltips, badges and modal renderer
             const pulseSyncNativeReact = t(53548);
             const NativeFieldComponent = pulseSyncNativeReact.lazy(() =>
-                Promise.all([t.e(1372), t.e(617), t.e(9522), t.e(3684), t.e(7371), t.e(818), t.e(2288)]).then(() => ({
+                Promise.all([t.e(1372), t.e(617), t.e(6305), t.e(3684), t.e(7371), t.e(818), t.e(2288)]).then(() => ({
                     default: t(11372).NativeField,
                 })),
             );
@@ -163,7 +169,7 @@
                     };
                 }),
             );
-            const NativeAddonBadge = pulseSyncNativeReact.lazy(() => t.e(79).then(() => ({ default: t(9958926).N }))),
+            const NativeAddonBadge = pulseSyncNativeReact.lazy(() => Promise.resolve({ default: t(9958926).N })),
                 nativeControlDom = t(53405),
                 nativeControlButton = t(96817),
                 nativeControlIcon = t(52300),
@@ -300,7 +306,7 @@
                 return renderer?.render() ?? null;
             }
             const NativeAddonModalContent = pulseSyncNativeReact.lazy(() =>
-                Promise.all([t.e(1372), t.e(617), t.e(9522), t.e(3684), t.e(7371), t.e(818), t.e(2288)]).then(() => ({
+                Promise.all([t.e(1372), t.e(617), t.e(6305), t.e(3684), t.e(7371), t.e(818), t.e(2288)]).then(() => ({
                     default: t(11372).AddonModalHost,
                 })),
             );

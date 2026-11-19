@@ -37,6 +37,10 @@ export function getSettingsItemSearchText(item: SettingsSchemaItem): (string | u
         return [item.id, item.text];
     }
 
+    if (item.type === 'custom') {
+        return [item.id];
+    }
+
     const text = [item.id, item.props.title, item.props.description];
 
     switch (item.type) {

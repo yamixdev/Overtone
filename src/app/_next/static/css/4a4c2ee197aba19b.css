@@ -1,0 +1,13 @@
+.MultivibeImage_root__X8dC_ {
+    height: 7.25rem;
+    height: var(--multivibe-image-size, 116px);
+    width: 7.25rem;
+    width: var(--multivibe-image-size, 116px);
+}
+.MultivibeImage_root_marginBlockStart__HuA2M {
+    margin-block-start: var(--ym-spacer-size-xxl);
+}
+.MultivibeImage_image___49QZ {
+    height: 100%;
+    width: 100%;
+}

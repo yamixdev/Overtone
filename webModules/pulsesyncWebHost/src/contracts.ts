@@ -31,7 +31,8 @@ export type PulseSyncResourcesApi = ResourceHooksApi & {
 
 export type Cleanup = () => void
 export type PulseSyncApi = Record<string, unknown>
-export type PulseSyncWebHostClient = PulseSyncWebHostApiV1 & DownloadsClient
+type Navigate = (path: string) => Promise<boolean>
+export type PulseSyncWebHostClient = PulseSyncWebHostApiV1 & DownloadsClient & { navigate?: Navigate }
 
 export type PulseSyncAddonIdentity = {
     id: string
@@ -276,7 +277,7 @@ export type PulseSyncAddonApi = {
     readonly localTracks: LocalTracksApi
     readonly downloads: DownloadsApi
     readonly page: PulseSyncPageApiV1
-    readonly router: PulseSyncRouterApiV1
+    readonly router: PulseSyncRouterApiV1 & { navigate: Navigate }
     readonly user: PulseSyncUserApiV1
     readonly notifications: PulseSyncAddonNotifications
     readonly toasts: AddonToasts

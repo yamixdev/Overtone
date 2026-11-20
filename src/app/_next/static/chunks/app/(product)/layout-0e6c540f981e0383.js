@@ -11633,10 +11633,10 @@
                 I = a(40617),
                 C = a(53647),
                 x = a(70066),
-                // for PulseSync: BEGIN experiment discovery, variant dropdowns and native override row rendering
-                T = a.n(x),
-                pulseExperimentNames = a(97956);
-            let UNSET_EXPERIMENT_GROUP_VALUE = '__pulse_sync_unset__',
+                T = a.n(x);
+            // for PulseSync: BEGIN experiment discovery, variant dropdowns and native override row rendering
+            const pulseExperimentNames = a(97956);
+            const UNSET_EXPERIMENT_GROUP_VALUE = '__pulse_sync_unset__',
                 IGNORED_EXPERIMENT_NAMES = new Set(['ABTestIds']),
                 EXPERIMENT_VARIANTS_CACHE = new Map(),
                 EXPERIMENT_VARIANTS_PENDING = new Map(),
@@ -11900,8 +11900,9 @@
                             onOpen: () => l(t),
                         })
                     );
-                }),
-                D = (0, i.PA)((e) => {
+                });
+            // for PulseSync: END experiment discovery, variant dropdowns and native override row rendering
+            let D = (0, i.PA)((e) => {
                     let { experiment: t = { name: '', value: {} }, readOnly: a, deleteMode: i } = e,
                         { experiments: o } = (0, u.g)(),
                         h = (0, d.N)().get(l.oo),
@@ -11977,7 +11978,6 @@
                         ],
                     });
                 }),
-                // for PulseSync: END experiment discovery, variant dropdowns and native override row rendering
                 R = { className: T().closeModalButton },
                 w = (0, i.PA)(() => {
                     let {
@@ -12019,7 +12019,7 @@
                             },
                             [f, v, storage, t],
                         ),
-                        pulseSyncMigration_P_1 = s.useCallback(async (e) => {
+                        loadExperimentVariants = s.useCallback(async (e) => {
                             let t = EXPERIMENT_VARIANTS_CACHE.get(e);
                             if (t) {
                                 y((a) => ({ ...a, [e]: t }));
@@ -12064,7 +12064,7 @@
                         k = normalizeSearchValue(o),
                         I = getExperimentEntries(t.overwrittenExperiments).map((e) => e[0]),
                         pulseSyncMigration_D_T = [...new Set([...p, ...I])].filter((e) => !IGNORED_EXPERIMENT_NAMES.has(e)),
-                        pulseSyncMigration_R_1 = pulseSyncMigration_D_T.filter((e) => !k || e.toLowerCase().includes(k)).sort((e, a) => {
+                        filteredExperimentNames = pulseSyncMigration_D_T.filter((e) => !k || e.toLowerCase().includes(k)).sort((e, a) => {
                             let r = hasExperimentValue(t.overwrittenExperiments, e) ? 0 : 1,
                                 i = hasExperimentValue(t.overwrittenExperiments, a) ? 0 : 1;
                             if (r !== i) return r - i;
@@ -12129,7 +12129,7 @@
                             // for PulseSync: BEGIN experiment count and scrollable override list
                             (0, r.jsx)('div', {
                                 style: { color: 'var(--ym-controls-color-secondary-text-enabled)', fontSize: '0.875rem', fontWeight: 500 },
-                                children: ''.concat(pulseSyncMigration_R_1.length, ' / ').concat(pulseSyncMigration_D_T.length, ' experiments'),
+                                children: ''.concat(filteredExperimentNames.length, ' / ').concat(pulseSyncMigration_D_T.length, ' experiments'),
                             }),
                             (0, r.jsx)('div', {
                                 className: 'PulseSync_experimentsListScroll',
@@ -12139,7 +12139,7 @@
                                     children: [
                                         // for PulseSync: BEGIN render native experiment variant dropdown rows
                                         // for PulseSync: BEGIN iterate filtered experiments and read their default and overridden groups
-                                        pulseSyncMigration_R_1.map((e) => {
+                                        filteredExperimentNames.map((e) => {
                                             let a = getExperimentValue(t.overwrittenExperiments, e),
                                                 i = getExperimentValue(t.experiments, e);
                                             return (0, r.jsx)(
@@ -12152,14 +12152,14 @@
                                                         defaultGroup: null == i ? void 0 : i.group,
                                                         optionsState: v[e],
                                                         onSelect: g,
-                                                        onOpenDropdown: pulseSyncMigration_P_1,
+                                                        onOpenDropdown: loadExperimentVariants,
                                                     }),
                                                 },
                                                 e,
                                             );
                                         }),
                                         // for PulseSync: END iterate filtered experiments and read their default and overridden groups
-                                        0 === pulseSyncMigration_R_1.length &&
+                                        0 === filteredExperimentNames.length &&
                                             (0, r.jsx)('li', {
                                                 className: T().overridedExperiment,
                                                 // for PulseSync: BEGIN empty experiment search result message

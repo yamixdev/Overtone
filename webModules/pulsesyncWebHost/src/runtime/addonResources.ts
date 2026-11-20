@@ -290,6 +290,11 @@ export function createAddonNamespaces(
         router: Object.freeze({
             getSnapshot: () => client.getRouteSnapshot(),
             onChange: listener => client.onRouteChange(listener),
+            navigate: async path => {
+                lifetime?.throwIfAborted()
+
+                return client.navigate?.(path) ?? false
+            },
         } satisfies PulseSyncAddonApi['router']),
         user: Object.freeze({
             getLogin: () => client.getUserLogin(),
